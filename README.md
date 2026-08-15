@@ -159,7 +159,7 @@ headless 同理：`dsh plugin --profile headless add dsh-deepseek-vision`（客�
 web 生效）。验证 bundle 层已挂载：`dsh --profile web --dump-config | grep llm-vl-gateway`。
 卸载与安装一一对应：`dsh plugin --profile <name> remove dsh-deepseek-vision`。
 
-无 CLI 时用方式 B（等价复刻官方流程：init 布局 → pnpm add → bundles 对账）：
+无 CLI 的机器用等价复刻（init 布局 → pnpm add → bundles 对账）：
 
 ```powershell
 pnpm install        # 只装 devDeps（typescript/vitest），不会装 @deepseek-ai/*
