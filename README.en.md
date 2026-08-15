@@ -67,6 +67,8 @@ Select the **DeepSeek + Vision** provider in the chat:
 
 ![DeepSeek + Vision provider in the model picker](./docs/images/provider-picker.png)
 
+![Pasting an image into the chat — it is described before DeepSeek sees it](./docs/images/chat.png)
+
 - **paste / drop an image** → the configured VL model describes it first (verbatim code,
   errors, logs, UI text, plus layout);
 - the description replaces the image for DeepSeek → you keep coding with DeepSeek while

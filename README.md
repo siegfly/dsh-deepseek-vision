@@ -59,6 +59,8 @@ headless profile、其他 spec 形式（git / 目录 / tarball）、无 CLI 的�
 
 ![模型选择器里的 DeepSeek + Vision provider](./docs/images/provider-picker.png)
 
+![聊天窗贴图，图片被描述后发送给 DeepSeek](./docs/images/chat.png)
+
 - **粘贴 / 拖入图片** → 被配置好的视觉模型先描述成文字（逐字提取代码、报错、日志、
   UI 文案，并描述布局）；
 - 描述文字替代图片发给 DeepSeek → 你继续用 DeepSeek 写代码，同时获得图片理解能力；
