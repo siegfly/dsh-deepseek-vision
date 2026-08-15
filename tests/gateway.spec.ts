@@ -54,6 +54,39 @@ async function withDeepSeekServer(run: (captured: Captured, port: number) => Pro
   }
 }
 
+/**
+ * A DeepSeek mock that streams a real SSE success: two content deltas, a
+ * finish_reason on the last, usage, and the `[DONE]` terminator — the exact
+ * shape the official parser consumes (EOF without `[DONE]` is STREAM_CLOSED).
+ */
+async function withStreamingDeepSeekServer(run: (captured: Captured, port: number) => Promise<void>): Promise<void> {
+  const captured: Captured = { body: undefined }
+  const server: Server = createServer((req, res) => {
+    captured.url = req.url
+    const chunks: Buffer[] = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', () => {
+      captured.body = chunks.length > 0 ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined
+      res.writeHead(200, { 'content-type': 'text/event-stream' })
+      res.write('data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n')
+      res.write('data: {"choices":[{"delta":{"content":" world"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2}}\n\n')
+      res.write('data: [DONE]\n\n')
+      res.end()
+    })
+  })
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => resolve())
+  })
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('no port')
+  try {
+    await run(captured, address.port)
+  } finally {
+    await new Promise<void>(resolve => server.close(() => resolve()))
+  }
+}
+
 async function drain(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
   const chunks: StreamChunk[] = []
   for await (const chunk of stream) chunks.push(chunk)
@@ -176,6 +209,31 @@ describe('VisionGatewayAdapter', () => {
         .rejects.toMatchObject({ name: 'LlmError', failure: { code: 'SERVER' } })
       const body = captured.body as { messages: { content: string }[] }
       expect(body.messages[0]!.content).toBe('plain question')
+    })
+  })
+
+  it('streams deltas, usage, and stop through unchanged while rewriting the image to text', async () => {
+    await withStreamingDeepSeekServer(async (captured, port) => {
+      const adapter = makeAdapter(port, async () => 'a wiring diagram')
+      const chunks = await drain(adapter.stream(imageRequest()))
+      // The full official chunk sequence, untouched by the gateway: the
+      // yield* passthrough is the plugin's core transparency promise.
+      expect(chunks.map(chunk => chunk.type)).toEqual([
+        'block-start', 'text-delta', 'text-delta', 'block-end', 'usage', 'finish',
+      ])
+      expect(chunks[1]).toMatchObject({ type: 'text-delta', text: 'Hello' })
+      expect(chunks[2]).toMatchObject({ type: 'text-delta', text: ' world' })
+      expect(chunks[3]).toMatchObject({ type: 'block-end', block: { type: 'text', text: 'Hello world' } })
+      expect(chunks[4]).toMatchObject({ type: 'usage', usage: { inputTokens: 3, outputTokens: 2 } })
+      expect(chunks[5]).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
+      // The rewrite happened before the stream: the DeepSeek wire saw the
+      // description, never the image.
+      const body = captured.body as { messages: { content: unknown }[] }
+      const wire = JSON.stringify(body)
+      expect(wire).toContain('a wiring diagram')
+      expect(wire).not.toContain('image_url')
+      expect(wire).not.toContain('data:image')
+      expect(wire).not.toContain('"type":"image"')
     })
   })
 })

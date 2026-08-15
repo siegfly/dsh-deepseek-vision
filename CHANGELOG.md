@@ -24,11 +24,18 @@ so releases keep installing on newer (or older) official dsh.
 - npm-only machine support: manifest-driven type/runtime resolution (schemastery
   `.mjs`/`.cjs`, client halves' `lib/types/client`), and client specs self-skip when
   the official client runtime has no Node-runnable form (npm publishes it
-  browser-only); checkout machines run all 80 tests.
+  browser-only); checkout machines run all 92 tests.
 - pnpm 11 profile quirks: `remove` only when a link exists; a non-zero `add` exit
   with a linked plugin on disk is tolerated (ignored native build scripts).
+- Real-boot smoke + seam coverage: the suite boots the official dsh launcher
+  (headless profile, temp `DSH_HOME`, mock DeepSeek/VL endpoints) and completes a
+  task turn through the gateway route — installation, bundle mounting, settings
+  resolution, and the wire, end to end. New tests cover the credentials service
+  path (`MISSING_CREDENTIAL`/`INVALID_CREDENTIAL`), live-settings keep-last-good
+  and directory-collision route rollback, config-schema rejections, and SSE
+  streaming passthrough.
 - Verified end-to-end against npm `@deepseek-ai/dsh@0.1.0-rc.6` from a fresh clone
-  with no source checkout: build, 68 tests (+12 designed skips), advisory
+  with no source checkout: build, 80 tests (+12 designed skips), advisory
   check-compat, install.
 - CI matrix (ubuntu / windows / macOS): checkout-mode drift canary plus the
   installed-mode foreign-machine path.
