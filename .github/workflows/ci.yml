@@ -16,8 +16,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    # The `runner` context is not accepted in job-level env; github.workspace is.
     env:
-      DSH_CHECKOUT: ${{ runner.temp }}/dsh
+      DSH_CHECKOUT: ${{ github.workspace }}/dsh
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -27,7 +28,7 @@ jobs:
         with:
           node-version: 22
       - name: Clone official dsh checkout (shallow)
-        run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$RUNNER_TEMP/dsh"
+        run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$GITHUB_WORKSPACE/dsh"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
@@ -47,8 +48,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    # The `runner` context is not accepted in job-level env; github.workspace is.
     env:
-      DSH_HOME: ${{ runner.temp }}/fake-home
+      DSH_HOME: ${{ github.workspace }}/fake-home
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -60,8 +62,8 @@ jobs:
       - name: Fake healed fallback from npm (dsh rc.6 tree)
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/fake-home/profiles/web"
-          cd "$RUNNER_TEMP/fake-home/profiles"
+          mkdir -p "$GITHUB_WORKSPACE/fake-home/profiles/web"
+          cd "$GITHUB_WORKSPACE/fake-home/profiles"
           pnpm init >/dev/null
           # pnpm exits non-zero with ERR_PNPM_IGNORED_BUILDS on dsh's native
           # toolchain deps even though the tree installs; assert on the tree
@@ -80,7 +82,7 @@ jobs:
             @deepseek-ai/cordis@4.0.1 @deepseek-ai/cosmokit@1.8.2 @deepseek-ai/schemastery@3.18.1 \
             react@18.2.0 || true
           test -f node_modules/@deepseek-ai/dsh/package.json
-          echo '{"name":"profile-web","private":true}' > "$RUNNER_TEMP/fake-home/profiles/web/package.json"
+          echo '{"name":"profile-web","private":true}' > "$GITHUB_WORKSPACE/fake-home/profiles/web/package.json"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Tests (client suites self-skip, npm ships the client runtime browser-only)

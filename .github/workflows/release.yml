@@ -19,8 +19,9 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # The `runner` context is not accepted in job-level env; github.workspace is.
     env:
-      DSH_CHECKOUT: ${{ runner.temp }}/dsh
+      DSH_CHECKOUT: ${{ github.workspace }}/dsh
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -31,7 +32,7 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
       - name: Clone official dsh checkout (shallow)
-        run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$RUNNER_TEMP/dsh"
+        run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$GITHUB_WORKSPACE/dsh"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
