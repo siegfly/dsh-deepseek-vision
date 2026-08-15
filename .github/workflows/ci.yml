@@ -76,7 +76,10 @@ jobs:
           # autoInstallPeers + hoistPattern '*' reproduce the launcher-healed
           # fallback's flat closure — the real heal links the launcher's whole
           # dependency tree flat, which no pnpm default reproduces on its own.
-          printf 'packages:\n  - .\n\nnodeLinker: hoisted\nhoistPattern:\n  - '"'"'*'"'"'\nautoInstallPeers: true\n' > pnpm-workspace.yaml
+          # allowBuilds lets the native packages (node-pty's pty.node above all)
+          # build — the launcher's own install has them approved; a boot dies
+          # on dsh-subprocess-local without them.
+          printf 'packages:\n  - .\n\nnodeLinker: hoisted\nhoistPattern:\n  - '"'"'*'"'"'\nautoInstallPeers: true\nallowBuilds:\n  esbuild: true\n  node-pty: true\n  koffi: true\n  protobufjs: true\n  '"'"'@google/genai'"'"': true\n  '"'"'@deepseek-ai/dsh-subprocess-local'"'"': true\n' > pnpm-workspace.yaml
           # pnpm exits non-zero with ERR_PNPM_IGNORED_BUILDS on dsh's native
           # toolchain deps even though the tree installs; assert on the tree
           # itself instead of the exit code.
