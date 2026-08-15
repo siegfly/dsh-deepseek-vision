@@ -17,6 +17,21 @@ lock on cross-machine installs.
 
 [English](README.en.md) | [中文](README.md)
 
+## Table of Contents
+
+- [Highlights](#highlights)
+- [Quick Start](#quick-start)
+- [What It Does](#what-it-does)
+- [How It Works](#how-it-works)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Install](#install)
+- [Version Alignment](#version-alignment)
+- [Development](#development)
+- [Boundaries & Notes](#boundaries--notes)
+- [FAQ](#faq)
+- [License](#license)
+
 ## Highlights
 
 - **Paste an image, keep your model:** registers the `deepseek-vision` route (display name
@@ -65,9 +80,8 @@ without the CLI — see [Install](#install).
 
 Select the **DeepSeek + Vision** provider in the chat:
 
-![DeepSeek + Vision provider in the model picker](./docs/images/provider-picker.png)
-
-![Pasting an image into the chat — it is described before DeepSeek sees it](./docs/images/chat.png)
+| ![DeepSeek + Vision provider in the model picker](./docs/images/provider-picker.png) | ![Pasting an image into the chat — it is described before DeepSeek sees it](./docs/images/chat.png) |
+| :---: | :---: |
 
 - **paste / drop an image** → the configured VL model describes it first (verbatim code,
   errors, logs, UI text, plus layout);
@@ -248,6 +262,25 @@ Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
   deployment limit can still exceed the VL provider's own size cap — mind `vl.timeoutMs`
   and the provider docs.
 - Descriptions consume DeepSeek context (a few hundred tokens per image, billed once).
+
+## FAQ
+
+**Do I need to care about Node versions to install it?** Not for the official path
+(`dsh plugin add`); only the no-CLI replica needs Node 22.19+ / 24+ and `pnpm` on PATH.
+
+**What does `#<sha>` mean?** A placeholder in the git spec form — replace it with a
+commit hash to pin an exact snapshot; everyday use just takes the npm form.
+
+**Does it support the CLI (headless)?** Yes. The gateway route behaves identically in
+both profiles; the settings card is web-only, and headless configures via `settings.yaml`.
+
+**After uninstalling, a session with image history cannot pick a model?** Expected: the
+official `selectModel` gate rejects text-only models for image-bearing sessions. New
+sessions are unaffected; reinstalling restores the gateway route.
+
+**Why not send the image to DeepSeek directly?** The official DeepSeek API is text-only
+(rejects `image_url`), so a VL model describes the image first — no model swap, no
+information loss.
 
 ## License
 

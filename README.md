@@ -15,6 +15,21 @@
 
 [English](README.en.md) | [中文](README.md)
 
+## 目录
+
+- [亮点](#亮点)
+- [快速开始](#快速开始)
+- [效果](#效果)
+- [工作原理](#工作原理)
+- [配置](#配置)
+- [使用](#使用)
+- [安装](#安装)
+- [版本对齐](#版本对齐)
+- [开发](#开发)
+- [边界与注意](#边界与注意)
+- [FAQ](#faq)
+- [许可](#许可)
+
 ## 亮点
 
 - **贴图即用，不用换模型：** 注册独立路由 `deepseek-vision`（显示名 *DeepSeek + Vision*），
@@ -57,9 +72,8 @@ headless profile、其他 spec 形式（git / 目录 / tarball）、无 CLI 的�
 
 聊天窗里选中 **DeepSeek + Vision** provider 之后：
 
-![模型选择器里的 DeepSeek + Vision provider](./docs/images/provider-picker.png)
-
-![聊天窗贴图，图片被描述后发送给 DeepSeek](./docs/images/chat.png)
+| ![模型选择器里的 DeepSeek + Vision provider](./docs/images/provider-picker.png) | ![聊天窗贴图，图片被描述后发送给 DeepSeek](./docs/images/chat.png) |
+| :---: | :---: |
 
 - **粘贴 / 拖入图片** → 被配置好的视觉模型先描述成文字（逐字提取代码、报错、日志、
   UI 文案，并描述布局）；
@@ -225,6 +239,23 @@ pnpm build     # tsc（宿主面 + 客户端面）+ tsdown 浏览器 bundle
   能力）；部署上限内的图片仍可能超过 VL 供应商自己的大小上限，建议控制 `vl.timeoutMs`
   并留意供应商文档。
 - 描述文本会占用 DeepSeek 的 context（每图几百 token，仅首次计费）。
+
+## FAQ
+
+**安装需要关心 Node 版本吗？** 官方 CLI 路径（`dsh plugin add`）不需要；只有无 CLI 的
+复刻脚本需要 Node 22.19+ / 24+ 和 PATH 里的 `pnpm`。
+
+**`#<sha>` 是什么？** git spec 形式的占位符——替换成具体 commit 哈希可锁死精确代码快照；
+日常使用走 npm 形式即可。
+
+**支持 CLI（headless）吗？** 支持。网关路由在两个 profile 行为一致；设置卡片是 web
+专属，headless 用 `settings.yaml` 配置。
+
+**卸载后，含图历史会话选不了模型？** 属预期行为：官方 `selectModel` 按
+`inputModalities` 拒绝文本模型接入含图会话。新会话不受影响，重装即恢复。
+
+**为什么图片不直接发给 DeepSeek？** 官方 DeepSeek 接口是纯文本的（会拒绝
+`image_url`），所以先由 VL 模型描述成文字再转发——不换模型、不丢信息。
 
 ## 许可
 
