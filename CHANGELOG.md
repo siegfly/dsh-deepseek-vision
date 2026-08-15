@@ -46,6 +46,8 @@ so releases keep installing on newer (or older) official dsh.
   with no source checkout: build, 83 tests (+12 designed skips), advisory
   check-compat, install.
 - CI matrix (ubuntu / windows / macOS): checkout-mode drift canary plus the
-  installed-mode foreign-machine path.
+  installed-mode foreign-machine path, including an official-CLI round-trip
+  (`dsh plugin --profile headless add/remove` against the real npm registry)
+  and an install→uninstall→boot round-trip through the profile scripts.
 - Live config: provider/displayName hot re-registration, image-limit fast-fail
   (`IMAGE_TOO_LARGE`), LRU description cache with truthful provenance stamps.

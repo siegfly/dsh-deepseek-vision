@@ -113,3 +113,9 @@ jobs:
           if [ "$code" -gt 1 ]; then exit "$code"; fi
       - name: Install into the fake profile (the exact user-machine flow)
         run: node scripts/install-profile.mjs web "$DSH_HOME"
+      - name: Official CLI round-trip from the real npm registry (headless profile)
+        shell: bash
+        run: |
+          node "$GITHUB_WORKSPACE/fake-home/profiles/node_modules/@deepseek-ai/dsh/lib/bin.js" plugin --profile headless add dsh-deepseek-vision
+          node "$GITHUB_WORKSPACE/fake-home/profiles/node_modules/@deepseek-ai/dsh/lib/bin.js" plugin --profile headless remove dsh-deepseek-vision
+          ! grep -q dsh-deepseek-vision "$GITHUB_WORKSPACE/fake-home/profiles/headless/package.json"
