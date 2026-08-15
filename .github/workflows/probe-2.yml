@@ -1,0 +1,11 @@
+name: probe-2
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo probe-2-ok
