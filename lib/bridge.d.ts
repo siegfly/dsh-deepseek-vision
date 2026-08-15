@@ -32,12 +32,14 @@ export interface ImageBridgeOptions {
  * Descriptions are cached per `attachmentId` for the process lifetime, so
  * retries, compaction passes, and later turns reuse the first description.
  * A failed in-flight description is evicted so the next attempt retries it.
+ * Each entry also records the model that produced it — the injected stamp
+ * must stay truthful even when the configured VL model changes afterwards.
  */
 export declare class ImageBridge {
     private readonly options;
     private readonly cache;
     constructor(options: ImageBridgeOptions);
-    /** Cached (or in-flight) description promise for one durable attachment. */
+    /** Cached (or in-flight) description for one durable attachment. */
     private descriptionFor;
     /** Rewrite one content-block array, recursing into tool results. */
     private rewriteBlocks;

@@ -41,20 +41,30 @@ function formatDescription(
   return `[Image:${name} ${ref.mediaType} ${ref.width}x${ref.height} — described by ${model}]\n${description}`
 }
 
+/** One cached description plus the model that actually produced it. */
+interface CachedDescription {
+  /** Wire model id in force when the description was produced. */
+  model: string
+  /** The description text. */
+  text: string
+}
+
 /**
  * Rewrites images inside one request into text descriptions.
  *
  * Descriptions are cached per `attachmentId` for the process lifetime, so
  * retries, compaction passes, and later turns reuse the first description.
  * A failed in-flight description is evicted so the next attempt retries it.
+ * Each entry also records the model that produced it — the injected stamp
+ * must stay truthful even when the configured VL model changes afterwards.
  */
 export class ImageBridge {
-  private readonly cache = new Map<string, Promise<string>>()
+  private readonly cache = new Map<string, Promise<CachedDescription>>()
 
   constructor(private readonly options: ImageBridgeOptions) {}
 
-  /** Cached (or in-flight) description promise for one durable attachment. */
-  private descriptionFor(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<string> {
+  /** Cached (or in-flight) description for one durable attachment. */
+  private descriptionFor(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<CachedDescription> {
     const id = ref.attachmentId
     const existing = this.cache.get(id)
     if (existing !== undefined) {
@@ -63,9 +73,14 @@ export class ImageBridge {
       this.cache.set(id, existing)
       return existing
     }
-    const pending = (async () => {
+    // Capture the producing model once per entry: the stamp attached to this
+    // description stays the one that actually described it, even if the
+    // settings change while the request is in flight or later on.
+    const model = this.options.describeModel()
+    const pending = (async (): Promise<CachedDescription> => {
       const stored = await this.options.attachments.readImage(ref, signal)
-      return this.options.describe(ref, stored.data, signal)
+      const text = await this.options.describe(ref, stored.data, signal)
+      return { model, text }
     })()
     if (this.cache.size >= this.options.maxCacheEntries()) {
       const oldest = this.cache.keys().next().value
@@ -90,7 +105,7 @@ export class ImageBridge {
         let text: string
         try {
           const description = await this.descriptionFor(block.attachment, signal)
-          text = formatDescription(block.attachment, description, this.options.describeModel())
+          text = formatDescription(block.attachment, description.text, description.model)
         } catch (error) {
           if (this.options.onFailure() === 'placeholder') {
             const reason = error instanceof Error ? error.message : String(error)

@@ -153,6 +153,24 @@ describe('ImageBridge.rewrite', () => {
     })
   })
 
+  it('stamps cached descriptions with the model that produced them, even after the model setting changes', async () => {
+    let model = 'qwen-vl-max'
+    const bridge = makeBridge(async () => 'screenshot content', { describeModel: () => model })
+    await bridge.rewrite(request([user([image(IMAGE_A)])]))
+    model = 'qwen-vl-plus'
+    const rewritten = await bridge.rewrite(request([user([image(IMAGE_A)])]))
+    // The cached text keeps the producing model's stamp: the setting changed,
+    // the provenance does not lie.
+    expect(rewritten.messages[0]!.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('described by qwen-vl-max'),
+    })
+    expect(rewritten.messages[0]!.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('screenshot content'),
+    })
+  })
+
   it('wraps non-LlmError describe failures as VL_DESCRIPTION_FAILED', async () => {
     const bridge = makeBridge(async () => {
       throw new Error('socket closed')
