@@ -34,25 +34,24 @@
 
 ## 快速开始
 
-前置：dsh 已安装并启动过一次、PATH 里有 `pnpm`、Node 22.19+ 或 24+。
+前置：dsh 已安装并启动过一次、Node 22.19+ 或 24+。
+
+**安装**（npm 发布版，推荐方式）：
 
 ```sh
-# 官方 bundle 机制，四种 spec 任选
-dsh plugin --profile web add dsh-deepseek-vision                          # npm
-dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git，锁 commit
-dsh plugin --profile web add file:<本仓库路径>                        # 本地目录（开发）
-dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
-
-# 验证 bundle 层已挂载
-dsh --profile web --dump-config | grep llm-vl-gateway
-
-# headless 同理（dsh run 默认 headless；客户端卡片只在 web 生效）
-dsh plugin --profile headless add dsh-deepseek-vision
+dsh plugin --profile web add dsh-deepseek-vision
 ```
 
-无 CLI 的机器：`pnpm install-profile`（等价复刻官方流程，见[安装](#安装)）。
-装完**重启一次 `dsh web`**。卸载：`dsh plugin --profile web remove dsh-deepseek-vision`
-（或 `pnpm uninstall-profile`）。
+**部署使用：** 重启一次 `dsh web` → Models 页选 **DeepSeek + Vision** → 设置 → 插件 →
+插件配置里填 VL 密钥 → 聊天窗贴图，发消息。
+
+**卸载：**
+
+```sh
+dsh plugin --profile web remove dsh-deepseek-vision
+```
+
+headless profile、其他 spec 形式（git / 目录 / tarball）、无 CLI 的机器——见[安装](#安装)。
 
 ## 效果
 
@@ -144,6 +143,19 @@ Agent 循环 / 网页搜索）同机制、同交互（暂存草稿、覆盖状�
 `cordis.patch.yml`），`dsh plugin add` 把包链接进 profile 并把包名对账进 profile
 manifest 的 `dsh.profile.bundles` 层栈，loader 启动时按层挂载——**不需要手工往
 `cordis.patch.yml` 加任何行**（旧版本加过的受管块会在下次安装/卸载时自动迁移移除）。
+
+四种 spec 任选：
+
+```sh
+dsh plugin --profile web add dsh-deepseek-vision                          # npm（推荐）
+dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git，锁 commit
+dsh plugin --profile web add file:<本仓库路径>                        # 本地目录（开发）
+dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
+```
+
+headless 同理：`dsh plugin --profile headless add dsh-deepseek-vision`（客户端卡片只在
+web 生效）。验证 bundle 层已挂载：`dsh --profile web --dump-config | grep llm-vl-gateway`。
+卸载与安装一一对应：`dsh plugin --profile <name> remove dsh-deepseek-vision`。
 
 无 CLI 时用方式 B（等价复刻官方流程：init 布局 → pnpm add → bundles 对账）：
 

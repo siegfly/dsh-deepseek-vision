@@ -40,25 +40,26 @@ lock on cross-machine installs.
 
 ## Quick Start
 
-Prerequisites: dsh installed and booted at least once, `pnpm` on PATH, Node 22.19+ or 24+.
+Prerequisites: dsh installed and booted at least once, Node 22.19+ or 24+.
+
+**Install** (from npm — the recommended path):
 
 ```sh
-# Official bundle mechanism — any spec form
-dsh plugin --profile web add dsh-deepseek-vision                          # npm
-dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git, pinned commit
-dsh plugin --profile web add file:<repo path>                        # local directory (dev)
-dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
-
-# Verify the bundle layer is mounted
-dsh --profile web --dump-config | grep llm-vl-gateway
-
-# headless works the same (dsh run defaults to headless; the client card is web-only)
-dsh plugin --profile headless add dsh-deepseek-vision
+dsh plugin --profile web add dsh-deepseek-vision
 ```
 
-Machines without the CLI: `pnpm install-profile` (an equivalent replica of the official
-flow, see [Install](#install)). **Restart `dsh web` once** after installing. Uninstall:
-`dsh plugin --profile web remove dsh-deepseek-vision` (or `pnpm uninstall-profile`).
+**Deploy & use:** restart `dsh web` once → pick **DeepSeek + Vision** on the Models
+page → fill the VL key in **Settings → Plugins → Plugin settings** → paste an image
+and send.
+
+**Uninstall:**
+
+```sh
+dsh plugin --profile web remove dsh-deepseek-vision
+```
+
+Headless profiles, the other spec forms (git / directory / tarball), and machines
+without the CLI — see [Install](#install).
 
 ## What It Does
 
@@ -158,6 +159,20 @@ Installation uses the **official bundle mechanism**: the package declares
 the package into the profile and reconciles the package name into the profile manifest's
 `dsh.profile.bundles` layer stack. **No manual `cordis.patch.yml` edits** (managed blocks
 from older versions are migrated away automatically on the next install/uninstall).
+
+Any of the official spec forms works — pick one:
+
+```sh
+dsh plugin --profile web add dsh-deepseek-vision                          # npm (recommended)
+dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git, pinned commit
+dsh plugin --profile web add file:<repo path>                        # local directory (dev)
+dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
+```
+
+Headless profiles work the same: `dsh plugin --profile headless add dsh-deepseek-vision`
+(the client card is web-only). Verify the bundle layer mounted:
+`dsh --profile web --dump-config | grep llm-vl-gateway`. Uninstall mirrors install for
+every form: `dsh plugin --profile <name> remove dsh-deepseek-vision`.
 
 Without the CLI, use the equivalent replica (init layout → pnpm add → bundles reconcile):
 
