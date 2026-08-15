@@ -137,6 +137,21 @@ describe('describeImage', () => {
     )
   })
 
+  it('carries a retry-after delay on rate limits for the harness retry machinery', async () => {
+    await withServer(
+      (captured, res) => {
+        res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '7' })
+        res.end(JSON.stringify({ error: { message: 'slow down' } }))
+      },
+      async (_captured, port) => {
+        await expect(describeImage({ ref: REF, data: new Uint8Array(), facts: factsAt(port) }))
+          .rejects.toMatchObject({
+            failure: { code: 'RATE_LIMIT', providerRetryAfterMs: 7_000 },
+          })
+      },
+    )
+  })
+
   it('maps an empty content body to EMPTY_RESPONSE', async () => {
     await withServer(
       (captured, res) => {

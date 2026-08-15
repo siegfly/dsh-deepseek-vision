@@ -32,6 +32,19 @@ const EXTERNALS = [
 
 const NODE_ENV = process.env.NODE_ENV ?? 'production'
 
+/**
+ * Build-time mirror of the official bundle purity gate
+ * (`packages/client/tsdown.client.ts`): platform seed entries stay external,
+ * inline-safe wire/type layers and vendored libraries inline, and every other
+ * `@deepseek-ai/*` VALUE import is a build error — a cross-plugin value import
+ * either inlines a duplicate runtime instance or requires a specifier the
+ * frozen module table cannot answer. Type-only imports are erased by tsc
+ * before this bundle is built and never reach the gate.
+ */
+const VENDORED_LIBRARY = /^@deepseek-ai\/(cosmokit|schemastery)(\/|$)/
+const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|session|llm|tools|brand)(\/|$)/
+const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
+
 export default defineConfig({
   entry: { client: 'lib/client/index.js' },
   outDir: 'lib',
@@ -49,6 +62,22 @@ export default defineConfig({
   // Anything not served by the module table must inline: a require() the
   // table cannot answer is a guaranteed runtime throw.
   noExternal: (id: string) => (EXTERNALS.includes(id) ? undefined : true),
+  plugins: [{
+    // Bundle purity gate (build-time mirror of the module-edge rules):
+    // platform seed entries stay external, inline-safe wire layers inline,
+    // and every other @deepseek-ai value import is a build error.
+    name: 'dsh-client-bundle-purity',
+    resolveId(source: string) {
+      if (!source.startsWith('@deepseek-ai/')) return null
+      if (EXTERNALS.includes(source)) return null // platform module: external wins
+      if (VENDORED_LIBRARY.test(source)) return null // vendored library: inline, no shared identity
+      if (INLINE_SAFE.test(source) || GENERATED_REMOTE.test(source)) return null // wire contribution: inline is the point
+      throw new Error(
+        `client bundle purity: "${source}" is not a platform module (CLIENT_EXTERNALS), an inline-safe wire layer, or a generated /remote contribution — `
+        + 'cross-plugin value imports are forbidden; collaborate through cordis services (type-only imports are erased and never reach this gate)',
+      )
+    },
+  }],
   outputOptions: {
     entryFileNames: 'client.js',
     banner: `window.__ModuleLoader__.load({ id: ${JSON.stringify(ID)}, factory: (require) => {`,

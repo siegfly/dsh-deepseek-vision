@@ -54,6 +54,20 @@ function statusCode(status: number, detail: string): string {
   return `HTTP_${status}`
 }
 
+/**
+ * Parse a `retry-after` header into the delay the harness retry machinery can
+ * honor (seconds, or an HTTP date). Mirrors llm-deepseek's parser exactly.
+ */
+function providerRetryAfterMs(value: string | null): number | undefined {
+  if (value === null) return undefined
+  if (/^\d+$/.test(value)) {
+    const delay = Number(value) * 1_000
+    return Number.isFinite(delay) && delay > 0 ? delay : undefined
+  }
+  const delay = Date.parse(value) - Date.now()
+  return Number.isFinite(delay) && delay > 0 ? delay : undefined
+}
+
 interface WireErrorBody {
   error?: {
     message?: unknown
@@ -147,7 +161,11 @@ export async function describeImage(input: VlDescribeInput): Promise<string> {
     } catch {
       // A malformed error body must not mask the HTTP status.
     }
-    throw new LlmError(message, statusCode(response.status, detail), { status: response.status })
+    const delay = providerRetryAfterMs(response.headers.get('retry-after'))
+    throw new LlmError(message, statusCode(response.status, detail), {
+      status: response.status,
+      ...delay === undefined ? {} : { providerRetryAfterMs: delay },
+    })
   }
 
   let payload: WireResponseBody
