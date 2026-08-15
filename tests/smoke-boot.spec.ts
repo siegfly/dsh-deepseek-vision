@@ -1,18 +1,21 @@
 /**
  * Real-boot smoke: boots the OFFICIAL dsh launcher (npm-published fallback or
  * the checkout's built bin) against a temp DSH_HOME where this plugin is
- * installed in a headless profile, then runs one task turn through the
- * gateway provider route against two local mock endpoints.
+ * installed in a profile, then exercises the two surfaces:
+ *
+ * - headless: one task turn through the gateway provider route against two
+ *   local mock endpoints — installation, bundle mounting, settings.yaml
+ *   resolution, credential env layer, and the DeepSeek wire, end to end.
+ * - web: the browser-UI server boots with the plugin bundle mounted and the
+ *   client scan picking up the dsh.client declaration, then serves HTTP.
  *
  * This closes the gap between "install-profile succeeded" and "the running
- * dsh actually registered the provider and served a request": the profile
- * patch-layer, bundle mounting, settings.yaml section resolution, credential
- * env layer, and the gateway's DeepSeek wire are all exercised end to end.
- * Text-only on purpose: image input needs the agent tool loop plus a real
- * image file, a later second stage.
+ * dsh actually registered the provider and served". Text-only on purpose:
+ * image input needs the agent tool loop plus a real image file, a later
+ * second stage.
  */
 
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -84,45 +87,84 @@ function launcherInvocation() {
   return { args: ['--import', 'tsx/esm', join(located.root, 'apps', 'cli', 'src', 'bin.ts')], cwd: located.root }
 }
 
-interface BootResult {
-  code: number | null
-  stdout: string
-  stderr: string
+/** A clean launcher environment: temp home, no ambient keys, no telemetry. */
+function launcherEnv(dshHome: string): NodeJS.ProcessEnv {
+  const env = { ...process.env }
+  for (const key of ['DEEPSEEK_API_KEY', 'QWEN_VL_API_KEY', 'DEEPSEEK_BASE_URL']) delete env[key]
+  env.DSH_HOME = dshHome
+  env.DSH_TELEMETRY_DISABLED = '1'
+  env.MOCK_DS_API_KEY = MOCK_DS_API_KEY
+  env.MOCK_VL_API_KEY = MOCK_VL_API_KEY
+  return env
 }
 
-/** Boot the launcher against the temp home; SIGKILL after a hard timeout. */
-function boot(dshHome: string, launcherArgs: string[], cwd: string | undefined): Promise<BootResult> {
-  return new Promise((resolve) => {
-    const env = { ...process.env }
-    for (const key of ['DEEPSEEK_API_KEY', 'QWEN_VL_API_KEY', 'DEEPSEEK_BASE_URL']) delete env[key]
-    env.DSH_HOME = dshHome
-    env.DSH_TELEMETRY_DISABLED = '1'
-    env.MOCK_DS_API_KEY = MOCK_DS_API_KEY
-    env.MOCK_VL_API_KEY = MOCK_VL_API_KEY
-    const child = spawn(process.execPath, [...launcherArgs, '--profile', 'headless', 'reply with the gateway marker'], {
-      cwd,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    let stdout = ''
-    let stderr = ''
-    child.stdout!.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
-    child.stderr!.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
-    const killTimer = setTimeout(() => child.kill('SIGKILL'), 90_000)
-    child.on('close', (code) => {
-      clearTimeout(killTimer)
-      resolve({ code, stdout, stderr })
-    })
+interface Launched {
+  child: ChildProcess
+  stdout: () => string
+  stderr: () => string
+  closed: Promise<number | null>
+}
+
+/** Spawn the launcher; stdout/stderr accumulate until read. */
+function launch(dshHome: string, launcherArgs: string[], cwd: string | undefined, appArgs: string[]): Launched {
+  const child = spawn(process.execPath, [...launcherArgs, ...appArgs], {
+    cwd,
+    env: launcherEnv(dshHome),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  let stdout = ''
+  let stderr = ''
+  child.stdout!.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
+  child.stderr!.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
+  const closed = new Promise<number | null>((resolve) => {
+    child.on('close', code => resolve(code))
+  })
+  return { child, stdout: () => stdout, stderr: () => stderr, closed }
+}
+
+/** Stage one profile: official manifest/patch/workspace shape + the plugin bundle. */
+function stageProfile(home: string, name: string, bundles: string[]): void {
+  const profileDir = join(home, 'profiles', name)
+  const pluginDir = join(profileDir, 'node_modules', 'dsh-vl-gateway')
+  mkdirSync(pluginDir, { recursive: true })
+  writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
+    name: `dsh-profile-${name}`,
+    private: true,
+    dependencies: {},
+    dsh: { profile: { bundles } },
+  }, undefined, 2) + '\n')
+  writeFileSync(join(profileDir, 'cordis.patch.yml'), '[]\n')
+  writeFileSync(join(profileDir, 'pnpm-workspace.yaml'), 'packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n')
+  cpSync(join(repoRoot, 'package.json'), join(pluginDir, 'package.json'))
+  cpSync(join(repoRoot, 'cordis.patch.yml'), join(pluginDir, 'cordis.patch.yml'))
+  cpSync(join(repoRoot, 'lib'), join(pluginDir, 'lib'), { recursive: true })
+}
+
+/** Wait until the accumulated stdout carries the `dsh web:` URL line. */
+function waitForWebUrl(stdout: () => string, timeoutMs: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const started = Date.now()
+    const timer = setInterval(() => {
+      const match = /dsh web: (http:\/\/\S+)/.exec(stdout())
+      if (match !== null) {
+        clearInterval(timer)
+        resolve(match[1]!)
+        return
+      }
+      if (Date.now() - started > timeoutMs) {
+        clearInterval(timer)
+        reject(new Error(`dsh web never printed its URL; stdout so far: ${JSON.stringify(stdout())}`))
+      }
+    }, 250)
   })
 }
 
 describe('real dsh boot smoke', () => {
-  const home = mkdtempSync(join(tmpdir(), 'dsh-smoke-'))
+  const headlessHome = mkdtempSync(join(tmpdir(), 'dsh-smoke-'))
   const servers: ChatServer[] = []
-  let result: BootResult
 
   afterAll(async () => {
-    rmSync(home, { recursive: true, force: true })
+    rmSync(headlessHome, { recursive: true, force: true })
     for (const server of servers) await server.close()
   })
 
@@ -132,24 +174,13 @@ describe('real dsh boot smoke', () => {
 
     // Headless profile layout, hand-placed exactly like the upstream built-bin
     // e2e: manifest + empty patch layer + pnpm settings + the plugin bundle.
-    const profileDir = join(home, 'profiles', 'headless')
-    const pluginDir = join(profileDir, 'node_modules', 'dsh-vl-gateway')
-    mkdirSync(pluginDir, { recursive: true })
-    writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
-      name: 'dsh-profile-headless',
-      private: true,
-      dependencies: {},
-      dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', 'dsh-vl-gateway'] } },
-    }, undefined, 2) + '\n')
-    writeFileSync(join(profileDir, 'cordis.patch.yml'), '[]\n')
-    writeFileSync(join(profileDir, 'pnpm-workspace.yaml'), 'packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n')
-    cpSync(join(repoRoot, 'package.json'), join(pluginDir, 'package.json'))
-    cpSync(join(repoRoot, 'cordis.patch.yml'), join(pluginDir, 'cordis.patch.yml'))
-    cpSync(join(repoRoot, 'lib'), join(pluginDir, 'lib'), { recursive: true })
+    stageProfile(headlessHome, 'headless', [
+      '@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', 'dsh-vl-gateway',
+    ])
 
     // Select the gateway route as the headless default model and point both
     // legs at the local mocks; keys come from the launch environment.
-    writeFileSync(join(home, 'settings.yaml'), [
+    writeFileSync(join(headlessHome, 'settings.yaml'), [
       'agent-default-model:',
       '  provider: deepseek-vision',
       '  model: deepseek-v4-flash',
@@ -164,13 +195,16 @@ describe('real dsh boot smoke', () => {
     ].join('\n'))
 
     const { args, cwd } = launcherInvocation()
-    result = await boot(home, args, cwd)
+    const launched = launch(headlessHome, args, cwd, ['--profile', 'headless', 'reply with the gateway marker'])
+    const killTimer = setTimeout(() => launched.child.kill('SIGKILL'), 90_000)
+    const code = await launched.closed
+    clearTimeout(killTimer)
 
     // The run must have completed cleanly and printed exactly the mock's
     // answer: the gateway route was registered, selected, and served.
-    expect(result.stderr).toBe('')
-    expect(result.code).toBe(0)
-    expect(result.stdout).toBe(`${MARKER}\n`)
+    expect(launched.stderr()).toBe('')
+    expect(code).toBe(0)
+    expect(launched.stdout()).toBe(`${MARKER}\n`)
 
     // The task turn went through the gateway route with the mock key; the
     // official composition may add one more gateway call (session title
@@ -182,5 +216,31 @@ describe('real dsh boot smoke', () => {
     expect(taskRequest!.authorization).toBe(`Bearer ${MOCK_DS_API_KEY}`)
     expect(deepseek.requests.every(request => request.authorization === `Bearer ${MOCK_DS_API_KEY}`)).toBe(true)
     expect(vl.requests).toHaveLength(0)
+  }, 120_000)
+
+  it('boots the web profile with the plugin bundle mounted and serves the browser UI', async () => {
+    const webHome = mkdtempSync(join(tmpdir(), 'dsh-smoke-web-'))
+    // Stage BEFORE launching: a missing manifest would make the launcher
+    // auto-init the official template profile (without this plugin), which
+    // would boot fine and prove nothing.
+    stageProfile(webHome, 'web', [
+      '@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-vl-gateway',
+    ])
+    const { args, cwd } = launcherInvocation()
+    const launched = launch(webHome, args, cwd, ['--profile', 'web', '--port', '0'])
+    const killTimer = setTimeout(() => launched.child.kill('SIGKILL'), 90_000)
+    try {
+      // The web bundle parses the profile layers (including this plugin's
+      // bundle patch) before it binds; a broken layer crashes instead of
+      // printing the URL.
+      const url = await waitForWebUrl(launched.stdout, 60_000)
+      const response = await fetch(url)
+      expect(response.status).toBe(200)
+    } finally {
+      clearTimeout(killTimer)
+      launched.child.kill('SIGKILL')
+      await launched.closed
+      rmSync(webHome, { recursive: true, force: true })
+    }
   }, 120_000)
 })
