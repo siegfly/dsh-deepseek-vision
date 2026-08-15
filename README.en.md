@@ -56,7 +56,8 @@ lock on cross-machine installs.
 
 ## Quick Start
 
-Prerequisites: dsh installed and booted at least once.
+Prerequisites: dsh installed and booted at least once, `pnpm` on PATH
+(`dsh plugin` installs plugins through pnpm).
 
 **Install** (from npm — the recommended path):
 
