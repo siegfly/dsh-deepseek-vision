@@ -9,6 +9,13 @@ records the dsh version the committed `lib/` was built against — provenance, n
 install gate: every install rebuilds the plugin against the target machine's own dsh,
 so releases keep installing on newer (or older) official dsh.
 
+## 0.1.2
+
+- Docs-only refresh: the npm page now renders the Chinese-default README with the
+  three-step install/deploy/uninstall quick start and all three screenshots; the Node
+  prerequisite moved to the no-CLI replica path (ordinary `dsh plugin add` users do
+  not need it); LICENSE year fixed. No code changes.
+
 ## 0.1.1
 
 - Docs & discoverability: screenshots of the provider picker and the plugin settings

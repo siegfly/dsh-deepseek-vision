@@ -1,7 +1,7 @@
 # dsh-deepseek-vision
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
-[![](https://img.shields.io/badge/release-v0.1.1-5B4CF0?style=flat-square)](./CHANGELOG.md)
+[![](https://img.shields.io/badge/release-v0.1.2-5B4CF0?style=flat-square)](./CHANGELOG.md)
 [![](https://img.shields.io/badge/verified-95%20tests-2EA44F?style=flat-square)](./tests)
 [![](https://img.shields.io/badge/license-MIT-0B7285?style=flat-square)](./LICENSE)
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
@@ -40,7 +40,7 @@ lock on cross-machine installs.
 
 ## Quick Start
 
-Prerequisites: dsh installed and booted at least once, Node 22.19+ or 24+.
+Prerequisites: dsh installed and booted at least once.
 
 **Install** (from npm — the recommended path):
 
@@ -176,7 +176,7 @@ Headless profiles work the same: `dsh plugin --profile headless add dsh-deepseek
 `dsh --profile web --dump-config | grep llm-vl-gateway`. Uninstall mirrors install for
 every form: `dsh plugin --profile <name> remove dsh-deepseek-vision`.
 
-Without the CLI, use the equivalent replica (init layout → pnpm add → bundles reconcile):
+Without the CLI, use the equivalent replica (needs Node 22.19+ or 24+ and `pnpm` on PATH; init layout → pnpm add → bundles reconcile):
 
 ```powershell
 pnpm install        # devDeps only (typescript/vitest), never @deepseek-ai/*

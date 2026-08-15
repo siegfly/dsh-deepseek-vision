@@ -1,7 +1,7 @@
 # dsh-deepseek-vision
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
-[![](https://img.shields.io/badge/release-v0.1.1-5B4CF0?style=flat-square)](./CHANGELOG.md)
+[![](https://img.shields.io/badge/release-v0.1.2-5B4CF0?style=flat-square)](./CHANGELOG.md)
 [![](https://img.shields.io/badge/verified-95%20tests-2EA44F?style=flat-square)](./tests)
 [![](https://img.shields.io/badge/license-MIT-0B7285?style=flat-square)](./LICENSE)
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
@@ -34,7 +34,7 @@
 
 ## 快速开始
 
-前置：dsh 已安装并启动过一次、Node 22.19+ 或 24+。
+前置：dsh 已安装并启动过一次。
 
 **安装**（npm 发布版，推荐方式）：
 
@@ -159,7 +159,7 @@ headless 同理：`dsh plugin --profile headless add dsh-deepseek-vision`（客�
 web 生效）。验证 bundle 层已挂载：`dsh --profile web --dump-config | grep llm-vl-gateway`。
 卸载与安装一一对应：`dsh plugin --profile <name> remove dsh-deepseek-vision`。
 
-无 CLI 的机器用等价复刻（init 布局 → pnpm add → bundles 对账）：
+无 CLI 的机器用等价复刻（需 Node 22.19+ 或 24+、PATH 里有 `pnpm`；init 布局 → pnpm add → bundles 对账）：
 
 ```powershell
 pnpm install        # 只装 devDeps（typescript/vitest），不会装 @deepseek-ai/*
