@@ -150,6 +150,11 @@ pnpm build     # harness-paths --write（生成 tsconfig.paths.json，gitignored
   测试会给出指引并停止。
 - 产物里的 `@deepseek-ai/*` 导入保持裸说明符，运行时走 profile fallback —— 类型解析
   缝只影响开发，不影响已安装的插件。
+- **纯 npm 机器上的测试面**：npm 发布的官方客户端包只在浏览器闭包里携带客户端运行时
+  （`lib/types/client` 仅有声明、无可执行 JS），Node 无法执行官方客户端运行时（官方自己
+  的客户端测试同样需要源码 checkout）。因此纯 npm 机器上 2 个客户端测试套件会**自行跳过**
+  （`tests/support/client-runtime.ts` 判定），其余 54 个照常运行；有官方源码 checkout 的
+  机器（开发机 / CI）跑全 66 个。
 - `tsdown.config.ts` 复刻官方 `packages/client/tsdown.client.ts` 预设的行为（该预设未
   发布）：`window.__ModuleLoader__.load({id, factory})` 闭包工厂、平台模块 external
   （react/slots/runtime/client 等由模块表解析）、其余全部内联；**不 import 官方仓库的

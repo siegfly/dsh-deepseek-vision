@@ -12,7 +12,9 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import { harnessRoot, resolvePackageDir } from './scripts/harness-paths.mjs'
 
-const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)))
+// This config file sits at the repo ROOT (unlike scripts/harness-paths.mjs,
+// which needs two dirname hops from scripts/), so one dirname gives the root.
+const repoRoot = dirname(fileURLToPath(import.meta.url))
 
 const located = harnessRoot()
 if (located === undefined) {
