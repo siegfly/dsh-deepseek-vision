@@ -6,20 +6,24 @@
  * official preset.
  *
  * The plugin resolves `@deepseek-ai/*` at RUNTIME from the target's own dsh
- * installation (the profile healed fallback), so the risk on a foreign
- * machine is API drift between the build anchor and the installed dsh — not
- * file placement. This script reads the installed versions from
+ * installation (the profile healed fallback), and install-profile rebuilds
+ * the plugin against the target's own dsh before this check runs — so a
+ * released plugin must stay installable on newer (or older) official dsh.
+ * This script reads the installed versions from
  * $DSH_HOME/profiles/node_modules (the launcher-maintained fallback), grades
- * each against the anchor, and prints rebuild guidance when they diverge.
+ * each against the anchor for the advisory report, and hard-fails only on
+ * release-integrity defects (unbuilt lib/, drifted client preset).
  *
  * Usage:
  *   node scripts/check-compat.mjs [dshHome]
  *
- * Exit codes: 0 = every spot-check matches the anchor (and the preset replica
- * matches the checkout, when one is available); 1 = adjacent prerelease (same
- * base, different rc — probably compatible, smoke-test it); 2 = version
- * mismatch (rebuild against the target dsh); 3 = client preset replica drift
- * (update tsdown.config.ts to the checkout's preset, then rebuild).
+ * Exit codes: 0 = every spot-check matches the anchor and the stamp is intact;
+ * 1 = ADVISORY difference (target dsh differs from the release anchor — any
+ * size, newer or older; installs proceed because install-profile rebuilt the
+ * plugin against the target's own dsh before this check ran); 2 = the release
+ * is unbuilt (no build-anchor stamp — a packaging defect, not a version
+ * issue); 3 = client preset replica drift (update tsdown.config.ts to the
+ * checkout's preset, then rebuild).
  */
 
 import { existsSync, readFileSync } from 'node:fs'
@@ -91,7 +95,15 @@ export function installedVersion(profilesNodeModules, pkg) {
 
 /**
  * Grade every spot-check against the anchor.
- * @returns the per-package rows and the process exit code.
+ *
+ * Version differences of ANY size are advisory here (exit 1), never a
+ * refusal: install-profile rebuilds the plugin against the target machine's
+ * own dsh before this check runs, so a successful build is already the
+ * compatibility proof. A released plugin does not force its users onto the
+ * anchor version — they may run newer (or older) official dsh.
+ *
+ * @returns the per-package rows and the process exit code
+ *   (0 = all match, 1 = any difference).
  */
 export function assess(profilesNodeModules) {
   const anchor = anchorVersion()
@@ -99,13 +111,8 @@ export function assess(profilesNodeModules) {
     const actual = installedVersion(profilesNodeModules, pkg)
     return { pkg, label, actual, verdict: actual === undefined ? 'missing' : compare(anchor, actual) }
   })
-  const worst = rows.reduce((level, row) => {
-    if (row.verdict === 'mismatch') return 'mismatch'
-    if (row.verdict === 'adjacent' && level === 'match') return 'adjacent'
-    if (row.verdict === 'missing' && level === 'match') return 'missing'
-    return level
-  }, 'match')
-  return { anchor, rows, exitCode: worst === 'mismatch' ? 2 : worst === 'match' ? 0 : 1 }
+  const exitCode = rows.every(row => row.verdict === 'match') ? 0 : 1
+  return { anchor, rows, exitCode }
 }
 
 /* ------------------------------------------------------------------ *
@@ -216,17 +223,19 @@ export function buildAnchorStamp(stampPath = join(repo, 'lib', 'build-anchor.jso
 }
 
 /**
- * Grade the committed build stamp against the declared anchor. This is the
- * honesty check: `dshCompat.anchorVersion` is hand-written metadata, and only
- * the stamp proves the committed lib/ was really built against that version.
- * @returns verdict `ok`, `missing` (lib predates the stamp), `lie` (the
- *   stamp and the declared anchor disagree — the tag would mislead), or
- *   `unreadable`.
+ * Grade the committed build stamp against the declared anchor.
+ *
+ * `dshCompat.anchorVersion` is hand-written metadata; the stamp is the
+ * mechanical record of what lib/ was really built against.
+ * @returns verdict `ok` (stamp and anchor agree), `diverged` (they differ —
+ *   EXPECTED on a target machine after install-profile's rebuild, which
+ *   restamps against the target's own dsh, so it is advisory, not a lie), or
+ *   `missing` (no stamp at all — the lib/ was never built, a release defect).
  */
 export function gradeBuildAnchor(stamp, anchor) {
   if (stamp === undefined) return 'missing'
   if (stamp.version === anchor) return 'ok'
-  return 'lie'
+  return 'diverged'
 }
 
 /**
@@ -269,46 +278,44 @@ function main() {
   const { anchor, rows, exitCode } = assess(profilesNodeModules)
 
   console.log(`dsh-vl-gateway compatibility check`)
-  console.log(`  anchor (built against): dsh ${anchor}`)
-  console.log(`  checked via:            ${profilesNodeModules}`)
+  console.log(`  release anchor (committed lib/ built against): dsh ${anchor}`)
+  console.log(`  target profile:                               ${profilesNodeModules}`)
   console.log('')
-  let missing = false
   for (const row of rows) {
-    const mark = row.verdict === 'match' ? 'OK ' : row.verdict === 'adjacent' ? '~  ' : row.verdict === 'missing' ? '?? ' : 'XX '
+    const mark = row.verdict === 'match' ? 'OK ' : row.verdict === 'missing' ? '?? ' : '~  '
     console.log(`  ${mark} ${row.label.padEnd(28)} ${row.actual ?? '(not found)'}`)
-    if (row.verdict === 'missing') missing = true
+  }
+  if (rows.some(row => row.verdict === 'missing')) {
+    console.log('One or more spot-check packages are absent from the fallback — boot `dsh web` once on this machine (the launcher maintains that directory).')
   }
 
-  // Build-anchor honesty check: the committed stamp must equal the declared
-  // anchor, or the tag/message this release ships under would mislead.
+  // Stamp: missing = the release was never built (packaging defect, refuse);
+  // diverged = the target rebuild restamped against this machine's own dsh —
+  // expected whenever the target differs from the anchor, so advisory.
   const stamp = buildAnchorStamp()
   const stampVerdict = gradeBuildAnchor(stamp, anchor)
   {
     const label = 'build anchor stamp (lib/)'
-    const mark = stampVerdict === 'ok' ? 'OK ' : stampVerdict === 'lie' ? 'XX ' : '?? '
+    const mark = stampVerdict === 'ok' ? 'OK ' : stampVerdict === 'missing' ? 'XX ' : '~  '
     console.log(`  ${mark} ${label.padEnd(28)} ${stamp === undefined ? '(missing — run `pnpm build` once)' : `${stamp.version} (${stamp.kind})`}`)
   }
   console.log('')
 
-  if (stampVerdict === 'lie') {
-    console.log(`The committed lib/ was built against dsh ${stamp.version} but dshCompat.anchorVersion declares ${anchor}. Update the anchor and re-tag, or rebuild against the declared version — do not ship this combination.`)
+  if (stampVerdict === 'missing') {
+    console.log('The committed lib/ carries no build-anchor stamp — the release was never built. Run `pnpm build` once (install-profile builds automatically before this check).')
     process.exit(2)
   }
-  if (stampVerdict === 'missing') {
-    console.log('The committed lib/ carries no build-anchor stamp yet. Run `pnpm build` once; the stamp is the mechanical proof the anchor matches the actual build.')
-  }
 
-  if (missing) {
-    console.log('The healed fallback has no entry for one or more packages. Boot `dsh web` once on this machine (the launcher maintains that directory), then re-run this check.')
-    process.exit(exitCode)
-  }
-  if (exitCode === 0) {
-    console.log('Installed dsh matches the anchor. The committed lib/ is expected to work as-is.')
-  } else if (exitCode === 1) {
-    console.log('Same version line, different prerelease — the public APIs this plugin uses are very likely unchanged, but rc releases make no compatibility promise. Paste an image once as a smoke test; if it fails, rebuild (see README “版本对齐”).')
+  let code = exitCode
+  if (code === 0 && stampVerdict === 'diverged') code = 1
+  if (code === 0) {
+    console.log('Target dsh matches the release anchor exactly.')
   } else {
-    console.log('Installed dsh diverges from the anchor. Rebuild the plugin against the target dsh before installing (see README “版本对齐”).')
-    process.exit(exitCode)
+    console.log('The target dsh differs from the release anchor. This is expected and allowed:')
+    console.log("install-profile rebuilt the plugin against this machine's own dsh before checking,")
+    console.log('so the installed artifact is native to it — no need to re-release or re-anchor for')
+    console.log('every official upgrade. Smoke-test once after install (paste an image).')
+    console.log('Conservative mode: DSH_VL_GATEWAY_STRICT=1 refuses installation on any difference.')
   }
 
   // Client preset drift: only a source checkout can answer this (the preset
@@ -316,8 +323,8 @@ function main() {
   const located = harnessRoot()
   if (located === undefined || located.kind !== 'checkout') {
     console.log('')
-    console.log('Client preset drift: skipped — no dsh source checkout ($DSH_CHECKOUT or harness-paths.json). The version check above is all an installed-dsh machine can verify.')
-    process.exit(exitCode)
+    console.log('Client preset drift: skipped — no dsh source checkout ($DSH_CHECKOUT or harness-paths.json).')
+    process.exit(code)
   }
   console.log('')
   console.log(`Client preset drift: ${located.root}`)
@@ -332,7 +339,7 @@ function main() {
     process.exit(3)
   }
   console.log('The frozen client-preset replica matches the checkout.')
-  process.exit(exitCode)
+  process.exit(code)
 }
 
 const invoked = process.argv[1] !== undefined

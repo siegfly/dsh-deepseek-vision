@@ -160,42 +160,45 @@ pnpm build     # harness-paths --write（生成 tsconfig.paths.json，gitignored
 ## 版本对齐（跨机器安装必读）
 
 插件的运行时 `@deepseek-ai/*` 依赖从**目标机器自己的 dsh 安装**解析（healed fallback），
-所以唯一的跨机器风险是"构建锚点版本 ≠ 目标安装版本"造成的 API 漂移。约定如下：
+且 `install-profile` 在检查之前会**先在目标机器上用目标机器自己的 dsh 类型重新构建**
+插件。因此：**本插件的发布版不锁定任何官方版本**——目标机器用比锚点更新（或更旧）的
+官方 dsh 都可以安装；构建成功本身就是兼容性证明。若新官方版改了本插件用到的 API，
+构建会自然失败并给出明确的 tsc 错误，那时才需要发新版适配。**作者无需跟随官方每次
+升级重新发布。**
 
-- `package.json` 的 `dshCompat.anchorVersion` 声明本发布版 `lib/` 的**构建锚点**
-  （当前 `0.1.0-rc.5`，即本机 checkout 的 `apps/cli` 版本）；
-- **构建戳让锚点无法撒谎**：`pnpm build` 末尾把实际解析到的 harness dsh 版本盖进提交的
-  `lib/build-anchor.json`；check-compat 校验"构建戳 = `anchorVersion`"，不一致直接
-  exit 2——拿新 checkout 重建了却忘记改锚点时，tag 会在发布前被拦下，而不是让
-  `v0.1.0-dsh-rc5` 装着按 rc.6 构建的产物；
-- 每次发版打 tag：`v<插件版本>-dsh-rc<N>`，例如 `v0.1.0-dsh-rc5` —— tag 直接标出锚点
-  （tag 本身不会跟随官方更新，它只是冻结的历史标签；"跟随"= 重建 + 改锚点 + 打新 tag）；
+- `package.json` 的 `dshCompat.anchorVersion` 只声明本发布版提交的 `lib/` 的**构建出处**
+  （当前 `0.1.0-rc.5`，即本机 checkout 的 `apps/cli` 版本），是出处声明而非安装许可；
+- **构建戳让出处无法撒谎**：`pnpm build` 末尾把实际解析到的 harness dsh 版本盖进提交的
+  `lib/build-anchor.json`。check-compat 对戳的判定：
+  - 戳存在且 = 锚点 → OK；
+  - 戳存在但 ≠ 锚点 → 提示（目标机重建后属**预期现象**：戳记录的是该机器自己的 dsh）；
+  - 戳缺失 → exit 2，**拒绝安装**（发布物从未构建过，是残缺发布；`install-profile`
+    本来就先构建，所以正常安装流程不会走到这里）。
+- 每次发版打 tag：`v<插件版本>-dsh-rc<N>`，例如 `v0.1.0-dsh-rc5` —— tag 只是冻结的
+  历史标签，不随官方更新，**也不需要**随官方更新。
 - **兼容性检查**（安装时自动运行，也可单独跑）：
   ```powershell
   node scripts/check-compat.mjs [dshHome]
   ```
   读取目标机器 `$DSH_HOME/profiles/node_modules` 里 `dsh`/`dsh-llm`/`dsh-llm-deepseek`/
-  `dsh-client-ui-settings-plugins` 的实际版本并对照锚点分级：完全一致=exit 0；同版本线
-  不同 rc（如 rc.5→rc.6）=exit 1（大概率兼容，建议贴图冒烟一次）；版本线不同=exit 2
-  （必须重建）。fallback 目录不存在（dsh web 还没启动过）时给出提示。
+  `dsh-client-ui-settings-plugins` 的实际版本并对照锚点分级：完全一致=exit 0；**任何
+  不一致（同线不同 rc、甚至不同版本线）=exit 1 提示并放行**。fallback 目录不存在
+  （dsh web 还没启动过）时给出提示。
 
-  `install-profile` 以这次检查为准绳：exit 2/3 会**拒绝安装**（已知不匹配的构建不会
-  替换掉在用的好构建；`DSH_VL_GATEWAY_FORCE=1` 可强制），exit 1 放行并保留上面的冒烟
-  提示。
+  `install-profile` 以这次检查为准绳：**exit 2/3 拒绝安装**（残缺发布/复刻漂移不会替换
+  掉在用的好构建；`DSH_VL_GATEWAY_FORCE=1` 可强制），exit 1 放行并保留冒烟提示。
+  保守用户可设 `DSH_VL_GATEWAY_STRICT=1`，此时 exit 1 也拒绝安装。
 
   此外，当本机有官方源码 checkout（`$DSH_CHECKOUT` 或 `harness-paths.json`）时，检查还会
   把本仓库 `tsdown.config.ts` 里**冻结复刻**的客户端 bundle 预设（模块表外部依赖清单、
   purity 正则、`__ModuleLoader__` 交接横幅/页脚）diff 到 checkout 里的官方预设——官方
   预设未发布，版本号对比看不出这些内容的漂移（新平台模块被内联=双实例风险；purity
-  门禁变化=交叉导入失控）。不一致时 exit 3，先更新复刻再重建。
+  门禁变化=交叉导入失控）。不一致时 exit 3，先更新复刻再重建。（这是唯一会要求作者
+  跟进的官方变更——它只发生在客户端打包预设上，且 checkout/CI 能提前发现。）
 
-**目标机器与锚点不一致时重建**（例如官方 `npx @deepseek-ai/dsh web` 装到了新 rc）：
-
-1. 在目标机器拿到对应版本的官方源码（`git clone --branch <对应tag>` 官方仓库），或
-   直接利用该机器已安装 dsh 的类型（上面的第三种解析来源，无需 clone）；
-2. 若 clone 了源码：设置 `$DSH_CHECKOUT=<源码路径>` 或写本仓库 `harness-paths.json`；
-3. `pnpm install && pnpm build && pnpm test`，然后 `node scripts/install-profile.mjs`；
-4. 把 `dshCompat.anchorVersion` 更新为新的锚点并打对应 tag。
+**何时才需要重新发布**：只有两种情况——① 新官方版改了本插件用到的 API，导致目标机
+构建失败（改代码适配后发新版）；② 官方客户端 bundle 预设漂移（更新冻结复刻后重建
+发新版）。单纯"官方升级了版本号"不是重新发布的理由，目标机会自动按自己的 dsh 重建。
 
 ## 边界与注意
 

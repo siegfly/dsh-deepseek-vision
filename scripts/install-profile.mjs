@@ -5,9 +5,12 @@
  * The profile lives at $DSH_HOME/profiles/<profile> (default: web). This
  * script is equivalent to `dsh plugin --profile <profile> add file:<repo>`
  * plus the patch-row edit, without requiring the dsh CLI on PATH. The install
- * is GATED on scripts/check-compat.mjs first: a version mismatch or a drifted
- * client-preset replica aborts before the profile is touched
- * (DSH_VL_GATEWAY_FORCE=1 overrides).
+ * is GATED on scripts/check-compat.mjs first, but only release-integrity
+ * defects refuse (unbuilt lib/ = exit 2, drifted client preset = exit 3;
+ * DSH_VL_GATEWAY_FORCE=1 overrides): the build above already recompiled the
+ * plugin against this machine's own dsh, so target-version differences from
+ * the release anchor are advisory (exit 1, proceeds; DSH_VL_GATEWAY_STRICT=1
+ * refuses on them for conservative users).
  *
  * Usage:
  *   node scripts/install-profile.mjs [profile] [dshHome]
@@ -53,11 +56,15 @@ execFileSync(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', ['build'], {
   shell: process.platform === 'win32',
 })
 
-// 2. Compatibility gate BEFORE anything touches the profile: a version
-//    mismatch (exit 2) or a drifted client-preset replica (exit 3) aborts the
-//    install, so a known-bad build never replaces a working one. An adjacent
-//    prerelease (exit 1) proceeds with the smoke-test warning the checker
-//    printed. DSH_VL_GATEWAY_FORCE=1 overrides both refusals.
+// 2. Compatibility gate BEFORE anything touches the profile. Version
+//    differences between the target dsh and the release anchor are ADVISORY
+//    (exit 1): the build above already recompiled the plugin against this
+//    machine's own dsh, so a newer/older official version does not block the
+//    install — released plugins must keep installing after official upgrades.
+//    Only release-integrity defects refuse: an unbuilt release (exit 2, no
+//    build-anchor stamp) or a drifted client-preset replica (exit 3, checkout
+//    machines only). DSH_VL_GATEWAY_FORCE=1 overrides both refusals;
+//    DSH_VL_GATEWAY_STRICT=1 additionally refuses on the advisory exit 1.
 console.log('')
 const check = spawnSync(process.execPath, [join(repo, 'scripts', 'check-compat.mjs'), dshHome], {
   stdio: 'inherit',
@@ -65,9 +72,11 @@ const check = spawnSync(process.execPath, [join(repo, 'scripts', 'check-compat.m
 const checkCode = check.status ?? 1
 if (checkCode === 2 || checkCode === 3) {
   if (process.env.DSH_VL_GATEWAY_FORCE !== '1') {
-    fail('compatibility check failed — fix per README "版本对齐" or set DSH_VL_GATEWAY_FORCE=1 to install anyway')
+    fail('compatibility check failed — the release is unbuilt or its client preset drifted; see README "版本对齐" or set DSH_VL_GATEWAY_FORCE=1 to install anyway')
   }
   console.log('dsh-vl-gateway: forced install despite the compatibility failure')
+} else if (checkCode === 1 && process.env.DSH_VL_GATEWAY_STRICT === '1') {
+  fail('target dsh differs from the release anchor — DSH_VL_GATEWAY_STRICT=1 refuses (unset it to install with a warning)')
 }
 console.log('')
 

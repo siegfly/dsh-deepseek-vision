@@ -65,12 +65,20 @@ describe('fallback assessment', () => {
     expect(result.rows.every(row => row.verdict === 'adjacent')).toBe(true)
   })
 
-  it('grades a diverged machine as mismatch (exit 2)', () => {
+  it('grades a machine on a different base as advisory, not a refusal (exit 1)', () => {
     dir = mkdtempSync(join(tmpdir(), 'dsh-check-'))
     for (const { pkg } of SPOT_CHECKS) writeFixture(dir, pkg, '0.2.0-rc.1')
     const result = assess(dir)
-    expect(result.exitCode).toBe(2)
+    expect(result.exitCode).toBe(1)
     expect(result.rows.every(row => row.verdict === 'mismatch')).toBe(true)
+  })
+
+  it('grades a machine exactly on the anchor as a clean match (exit 0)', () => {
+    dir = mkdtempSync(join(tmpdir(), 'dsh-check-'))
+    for (const { pkg } of SPOT_CHECKS) writeFixture(dir, pkg, '0.1.0-rc.5')
+    const result = assess(dir)
+    expect(result.exitCode).toBe(0)
+    expect(result.rows.every(row => row.verdict === 'match')).toBe(true)
   })
 })
 
@@ -89,9 +97,9 @@ describe('build anchor stamp', () => {
     expect(buildAnchorStamp(join(dir, 'absent.json'))).toBeUndefined()
   })
 
-  it('grades the stamp against the declared anchor: ok, lie, missing', () => {
+  it('grades the stamp against the declared anchor: ok, diverged, missing', () => {
     expect(gradeBuildAnchor({ version: '0.1.0-rc.5', kind: 'checkout' }, '0.1.0-rc.5')).toBe('ok')
-    expect(gradeBuildAnchor({ version: '0.1.0-rc.6', kind: 'checkout' }, '0.1.0-rc.5')).toBe('lie')
+    expect(gradeBuildAnchor({ version: '0.1.0-rc.6', kind: 'checkout' }, '0.1.0-rc.5')).toBe('diverged')
     expect(gradeBuildAnchor(undefined, '0.1.0-rc.5')).toBe('missing')
   })
 
