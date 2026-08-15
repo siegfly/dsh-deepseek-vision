@@ -224,7 +224,8 @@ pnpm build     # tsc（宿主面 + 客户端面）+ tsdown 浏览器 bundle
   有官方源码 checkout 的机器跑全量。
 - 产物里的 `@deepseek-ai/*` 导入保持裸说明符，运行时走 profile fallback。
 
-细节：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
+细节：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。贡献指南：[CONTRIBUTING.md](CONTRIBUTING.md)；
+安全漏洞报告：[SECURITY.md](SECURITY.md)。
 
 ## 边界与注意
 

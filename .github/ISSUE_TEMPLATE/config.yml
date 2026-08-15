@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: README FAQ
+    url: https://github.com/siegfly/dsh-deepseek-vision#faq
+    about: Many questions are already answered in the FAQ section.

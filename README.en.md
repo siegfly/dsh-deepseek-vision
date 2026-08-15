@@ -243,7 +243,8 @@ pnpm build     # tsc (host + client) + tsdown browser bundle
 - Built artifacts keep bare `@deepseek-ai/*` specifiers resolved through the profile
   fallback at runtime.
 
-Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Contributing:
+[CONTRIBUTING.md](CONTRIBUTING.md); security reporting: [SECURITY.md](SECURITY.md).
 
 ## Boundaries & Notes
 

@@ -1,0 +1,68 @@
+name: Bug report
+description: Something is not working as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. The more precise the
+        report, the faster it gets fixed.
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: e.g. 0.1.3 (`npm ls dsh-deepseek-vision`, or the profile manifest)
+    validations:
+      required: true
+  - type: input
+    id: dsh-version
+    attributes:
+      label: dsh version
+      description: e.g. 0.1.0-rc.6 (the installed launcher manifest or the package manager)
+    validations:
+      required: true
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Profile
+      options:
+        - web
+        - headless
+        - other
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Error codes (AUTH / TIMEOUT / TRANSPORT / ...), stderr output, screenshots.
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant configuration (redact secrets!)
+      description: The `llm-vl-gateway` section WITHOUT any API keys.
+      render: yaml
