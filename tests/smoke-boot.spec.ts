@@ -23,6 +23,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
 import { harnessRoot } from '../scripts/harness-paths.mjs'
+import { PLUGIN_PACKAGE_NAME } from '../scripts/profile-layer.mjs'
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const MARKER = 'gateway-smoke-ok'
@@ -75,7 +76,7 @@ async function startChatServer(kind: 'deepseek' | 'vl'): Promise<ChatServer> {
 function launcherInvocation() {
   const located = harnessRoot()
   if (located === undefined) {
-    throw new Error('dsh-vl-gateway smoke: no harness source resolved (see scripts/harness-paths.mjs)')
+    throw new Error('dsh-deepseek-vision smoke: no harness source resolved (see scripts/harness-paths.mjs)')
   }
   if (located.kind === 'installed') {
     return { args: [join(located.root, '@deepseek-ai', 'dsh', 'lib', 'bin.js')], cwd: undefined }
@@ -125,7 +126,7 @@ function launch(dshHome: string, launcherArgs: string[], cwd: string | undefined
 /** Stage one profile: official manifest/patch/workspace shape + the plugin bundle. */
 function stageProfile(home: string, name: string, bundles: string[]): void {
   const profileDir = join(home, 'profiles', name)
-  const pluginDir = join(profileDir, 'node_modules', 'dsh-vl-gateway')
+  const pluginDir = join(profileDir, 'node_modules', PLUGIN_PACKAGE_NAME)
   mkdirSync(pluginDir, { recursive: true })
   writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
     name: `dsh-profile-${name}`,
@@ -175,7 +176,7 @@ describe('real dsh boot smoke', () => {
     // Headless profile layout, hand-placed exactly like the upstream built-bin
     // e2e: manifest + empty patch layer + pnpm settings + the plugin bundle.
     stageProfile(headlessHome, 'headless', [
-      '@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', 'dsh-vl-gateway',
+      '@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless', PLUGIN_PACKAGE_NAME,
     ])
 
     // Select the gateway route as the headless default model and point both
@@ -224,7 +225,7 @@ describe('real dsh boot smoke', () => {
     // auto-init the official template profile (without this plugin), which
     // would boot fine and prove nothing.
     stageProfile(webHome, 'web', [
-      '@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-vl-gateway',
+      '@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', PLUGIN_PACKAGE_NAME,
     ])
     const { args, cwd } = launcherInvocation()
     const launched = launch(webHome, args, cwd, ['--profile', 'web', '--port', '0'])

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to dsh-vl-gateway are documented here.
+All notable changes to dsh-deepseek-vision are documented here.
 
 The plugin follows dsh's bundle publishing conventions: each release ships the built
 `lib/`, the build-anchor stamp (`lib/build-anchor.json`), and the bundle patch

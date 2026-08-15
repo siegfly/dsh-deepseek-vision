@@ -1,15 +1,15 @@
 {
-  "name": "dsh-vl-gateway",
+  "name": "dsh-deepseek-vision",
   "version": "0.1.0",
   "description": "Out-of-tree dsh provider plugin: a DeepSeek gateway route that claims image input and transparently describes pasted images through a configured vision-language model (e.g. Qwen-VL) before the text-only DeepSeek wire sees them.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/siegfly/dsh-vl-gateway.git"
+    "url": "git+https://github.com/siegfly/dsh-deepseek-vision.git"
   },
   "bugs": {
-    "url": "https://github.com/siegfly/dsh-vl-gateway/issues"
+    "url": "https://github.com/siegfly/dsh-deepseek-vision/issues"
   },
-  "homepage": "https://github.com/siegfly/dsh-vl-gateway#readme",
+  "homepage": "https://github.com/siegfly/dsh-deepseek-vision#readme",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

@@ -1,5 +1,5 @@
 /**
- * Client plugin half of dsh-vl-gateway: registers one config card into the
+ * Client plugin half of dsh-deepseek-vision: registers one config card into the
  * Plugins → plugin-config section (slot `settings.plugin.item`) so the
  * `llm-vl-gateway.vl` section — endpoint, model, prompt, and the VL key — is
  * editable from the web GUI exactly like the in-box plugin cards.
@@ -9,7 +9,7 @@
  * path-addressed settings writes and the credential domain, locale for copy,
  * and the slots registry for the card contribution.
  *
- * @module dsh-vl-gateway/client
+ * @module dsh-deepseek-vision/client
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
 /** Required services (cordis fiber inject). */

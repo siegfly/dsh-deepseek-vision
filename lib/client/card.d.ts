@@ -8,7 +8,7 @@
  * stylesheet injected at plugin load (the official client bundles do the same
  * through their CSS pipeline; this out-of-tree bundle ships a plain style tag).
  *
- * @module dsh-vl-gateway/client/card
+ * @module dsh-deepseek-vision/client/card
  */
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import type { VlGatewayCardFace } from './controller.js';

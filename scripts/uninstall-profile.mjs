@@ -19,7 +19,7 @@ const dshHome = process.argv[3] ?? process.env.DSH_HOME ?? join(os.homedir(), '.
 const profileDir = join(dshHome, 'profiles', profile)
 
 function fail(message) {
-  console.error(`dsh-vl-gateway: ${message}`)
+  console.error(`dsh-deepseek-vision: ${message}`)
   process.exit(1)
 }
 
@@ -41,7 +41,7 @@ if (linkPaths.some(p => existsSync(p))) {
     fail(`pnpm remove ${PLUGIN_PACKAGE_NAME} failed in ${profileDir}`)
   }
 } else {
-  console.log('dsh-vl-gateway: no installed link — skipping pnpm remove')
+  console.log('dsh-deepseek-vision: no installed link — skipping pnpm remove')
 }
 
 // Reconcile the bundle stack: a dependency-managed bundle entry leaves with
@@ -58,9 +58,9 @@ if (linkPaths.some(p => existsSync(p))) {
     const { manifest: next, changed } = removeBundle(manifest, PLUGIN_PACKAGE_NAME)
     if (changed) {
       writeFileSync(manifestPath, JSON.stringify(next, undefined, 2) + '\n')
-      console.log(`dsh-vl-gateway: removed from dsh.profile.bundles in ${manifestPath}`)
+      console.log(`dsh-deepseek-vision: removed from dsh.profile.bundles in ${manifestPath}`)
     } else {
-      console.log('dsh-vl-gateway: not listed in dsh.profile.bundles')
+      console.log('dsh-deepseek-vision: not listed in dsh.profile.bundles')
     }
   }
 }
@@ -72,7 +72,7 @@ if (existsSync(patchPath)) {
   const { text, removed } = stripManagedBlock(readFileSync(patchPath, 'utf8'))
   if (removed) {
     writeFileSync(patchPath, text)
-    console.log(`dsh-vl-gateway: removed legacy managed block from ${patchPath}`)
+    console.log(`dsh-deepseek-vision: removed legacy managed block from ${patchPath}`)
   }
 }
-console.log('dsh-vl-gateway: uninstalled')
+console.log('dsh-deepseek-vision: uninstalled')

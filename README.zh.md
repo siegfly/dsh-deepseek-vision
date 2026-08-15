@@ -1,4 +1,4 @@
-# dsh-vl-gateway
+# dsh-deepseek-vision
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 [![](https://img.shields.io/badge/release-v0.1.0--dsh--rc5-5B4CF0?style=flat-square)](./CHANGELOG.md)
@@ -7,9 +7,9 @@
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
 [![](https://img.shields.io/badge/DSH-Web%20%2B%20Headless-5B4CF0?style=flat-square)](./cordis.patch.yml)
 
-**安装：** `dsh plugin --profile web add dsh-vl-gateway`
+**安装：** `dsh plugin --profile web add dsh-deepseek-vision`
 
-**dsh-vl-gateway 是给 DeepSeek Harness 的视觉语言网关插件。** 纯文本的 DeepSeek 编程模型
+**dsh-deepseek-vision 是给 DeepSeek Harness 的视觉语言网关插件。** 纯文本的 DeepSeek 编程模型
 通过一个"网关"provider 路由获得贴图能力：图片先由可配置的视觉模型（默认 Qwen-VL）
 逐字描述成文字，再交给 DeepSeek 继续写代码。官方仓库零改动、跨机器安装不锁官方版本。
 
@@ -38,20 +38,20 @@
 
 ```sh
 # 官方 bundle 机制，四种 spec 任选
-dsh plugin --profile web add dsh-vl-gateway                          # npm
-dsh plugin --profile web add github:siegfly/dsh-vl-gateway#<sha>       # git，锁 commit
+dsh plugin --profile web add dsh-deepseek-vision                          # npm
+dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git，锁 commit
 dsh plugin --profile web add file:<本仓库路径>                        # 本地目录（开发）
-dsh plugin --profile web add ./dsh-vl-gateway-0.1.0.tgz              # tarball
+dsh plugin --profile web add ./dsh-deepseek-vision-0.1.0.tgz              # tarball
 
 # 验证 bundle 层已挂载
 dsh --profile web --dump-config | grep llm-vl-gateway
 
 # headless 同理（dsh run 默认 headless；客户端卡片只在 web 生效）
-dsh plugin --profile headless add dsh-vl-gateway
+dsh plugin --profile headless add dsh-deepseek-vision
 ```
 
 无 CLI 的机器：`pnpm install-profile`（等价复刻官方流程，见[安装](#安装)）。
-装完**重启一次 `dsh web`**。卸载：`dsh plugin --profile web remove dsh-vl-gateway`
+装完**重启一次 `dsh web`**。卸载：`dsh plugin --profile web remove dsh-deepseek-vision`
 （或 `pnpm uninstall-profile`）。
 
 ## 效果
@@ -114,7 +114,7 @@ patch 行内配置示例（全部可选）：
 ```yaml
 - insert:
     - id: llm-vl-gateway
-      name: dsh-vl-gateway
+      name: dsh-deepseek-vision
       config:
         deepseek:
           reasoningEffort: high
@@ -150,9 +150,9 @@ pnpm install-profile          # 或 node scripts/install-profile.mjs [profile] [
 
 两种方式做同样的事：
 
-- 把 `dsh-vl-gateway` 链接进 profile 的 node_modules（运行时 `@deepseek-ai/*` 依赖经
+- 把 `dsh-deepseek-vision` 链接进 profile 的 node_modules（运行时 `@deepseek-ai/*` 依赖经
   官方 healed fallback 解析到**同一个** dsh 安装，共享同一个 cordis 实例，无双实例问题）；
-- 把 `dsh-vl-gateway` 对账进 `dsh.profile.bundles`——loader 按层挂载包内
+- 把 `dsh-deepseek-vision` 对账进 `dsh.profile.bundles`——loader 按层挂载包内
   `cordis.patch.yml` 的 insert 行（注册路由 + 设置段）；
 - 首次安装时如 profile 布局缺失，按官方 `initProfile` 语义补齐（manifest + 空用户
   patch 层 + `pnpm-workspace.yaml`），**已存在的文件从不改动**。

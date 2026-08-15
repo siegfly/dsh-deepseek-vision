@@ -19,11 +19,11 @@ const repoRoot = dirname(fileURLToPath(import.meta.url))
 const located = harnessRoot()
 if (located === undefined) {
   throw new Error(
-    'dsh-vl-gateway vitest: no harness types found — set $DSH_CHECKOUT, create a local '
+    'dsh-deepseek-vision vitest: no harness types found — set $DSH_CHECKOUT, create a local '
     + 'harness-paths.json, or boot `dsh web` once on this machine (see README).',
   )
 }
-console.log(`dsh-vl-gateway vitest: harness source ${located.root} (${located.kind})`)
+console.log(`dsh-deepseek-vision vitest: harness source ${located.root} (${located.kind})`)
 
 /** Read one conditional export (or `main`/`module`) from a package manifest. */
 function manifestEntry(dir: string, subpath: string): string | undefined {
@@ -54,7 +54,7 @@ function manifestEntry(dir: string, subpath: string): string | undefined {
 function runtimeEntry(specifier) {
   const dir = resolvePackageDir(specifier)
   if (dir === undefined) {
-    throw new Error(`dsh-vl-gateway vitest: no workspace package for ${specifier}`)
+    throw new Error(`dsh-deepseek-vision vitest: no workspace package for ${specifier}`)
   }
   const isClient = specifier.endsWith('/client')
   if (located.kind === 'checkout') {
@@ -83,7 +83,7 @@ function runtimeEntry(specifier) {
   if (entry !== undefined) return entry
   const legacy = join(dir, 'lib', 'index.js')
   if (existsSync(legacy)) return legacy
-  throw new Error(`dsh-vl-gateway vitest: no runtime entry for ${specifier} in ${dir}`)
+  throw new Error(`dsh-deepseek-vision vitest: no runtime entry for ${specifier} in ${dir}`)
 }
 
 export default defineConfig({

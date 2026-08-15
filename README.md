@@ -1,4 +1,4 @@
-# dsh-vl-gateway
+# dsh-deepseek-vision
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 [![](https://img.shields.io/badge/release-v0.1.0--dsh--rc5-5B4CF0?style=flat-square)](./CHANGELOG.md)
@@ -7,7 +7,7 @@
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
 [![](https://img.shields.io/badge/DSH-Web%20%2B%20Headless-5B4CF0?style=flat-square)](./cordis.patch.yml)
 
-**Install:** `dsh plugin --profile web add dsh-vl-gateway`
+**Install:** `dsh plugin --profile web add dsh-deepseek-vision`
 
 **A vision-language gateway plugin for DeepSeek Harness.** A text-only DeepSeek coding
 model gains image support through a "gateway" provider route: pasted images are first
@@ -44,21 +44,21 @@ Prerequisites: dsh installed and booted at least once, `pnpm` on PATH, Node 22.1
 
 ```sh
 # Official bundle mechanism — any spec form
-dsh plugin --profile web add dsh-vl-gateway                          # npm
-dsh plugin --profile web add github:siegfly/dsh-vl-gateway#<sha>       # git, pinned commit
+dsh plugin --profile web add dsh-deepseek-vision                          # npm
+dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git, pinned commit
 dsh plugin --profile web add file:<repo path>                        # local directory (dev)
-dsh plugin --profile web add ./dsh-vl-gateway-0.1.0.tgz              # tarball
+dsh plugin --profile web add ./dsh-deepseek-vision-0.1.0.tgz              # tarball
 
 # Verify the bundle layer is mounted
 dsh --profile web --dump-config | grep llm-vl-gateway
 
 # headless works the same (dsh run defaults to headless; the client card is web-only)
-dsh plugin --profile headless add dsh-vl-gateway
+dsh plugin --profile headless add dsh-deepseek-vision
 ```
 
 Machines without the CLI: `pnpm install-profile` (an equivalent replica of the official
 flow, see [Install](#install)). **Restart `dsh web` once** after installing. Uninstall:
-`dsh plugin --profile web remove dsh-vl-gateway` (or `pnpm uninstall-profile`).
+`dsh plugin --profile web remove dsh-deepseek-vision` (or `pnpm uninstall-profile`).
 
 ## What It Does
 
@@ -125,7 +125,7 @@ Inline patch config example (all optional):
 ```yaml
 - insert:
     - id: llm-vl-gateway
-      name: dsh-vl-gateway
+      name: dsh-deepseek-vision
       config:
         deepseek:
           reasoningEffort: high
@@ -162,7 +162,7 @@ pnpm install        # devDeps only (typescript/vitest), never @deepseek-ai/*
 pnpm install-profile          # or node scripts/install-profile.mjs [profile] [dshHome]
 ```
 
-Both paths do the same thing: link `dsh-vl-gateway` into the profile's node_modules
+Both paths do the same thing: link `dsh-deepseek-vision` into the profile's node_modules
 (runtime `@deepseek-ai/*` imports resolve through the official healed fallback to the
 **same** dsh install — one shared cordis instance, no dual-instance issues); reconcile the
 package into `dsh.profile.bundles`; and, when the profile layout is missing, create it with

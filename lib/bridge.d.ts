@@ -7,7 +7,7 @@
  * wire-level transformation inside the adapter, which is exactly where the
  * agent-loop reconstruction invariant stops looking.
  *
- * @module dsh-vl-gateway/bridge
+ * @module dsh-deepseek-vision/bridge
  */
 import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import type { GenerateOptions } from '@deepseek-ai/dsh-llm';

@@ -59,6 +59,8 @@ describe('bundle reconcile', () => {
 })
 
 describe('legacy managed block migration', () => {
+  // The fixture carries the pre-rename row name, exactly as the legacy
+  // installs wrote it — the migration must recognize those old blocks.
   const block = `${PATCH_START}
 - insert:
     - id: llm-vl-gateway

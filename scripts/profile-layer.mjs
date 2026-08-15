@@ -15,11 +15,15 @@
  * existed, so older installs migrate to the single official mechanism.
  */
 
-/** Markers around the legacy managed block in the profile's cordis.patch.yml. */
+/**
+ * Markers around the legacy managed block in the profile's cordis.patch.yml.
+ * The old package name stays in the markers on purpose: they identify blocks
+ * written by installs from before the rename, which must still migrate away.
+ */
 export const PATCH_START = '# >>> dsh-vl-gateway (managed by install-profile.mjs)'
 export const PATCH_END = '# <<< dsh-vl-gateway'
 
-export const PLUGIN_PACKAGE_NAME = 'dsh-vl-gateway'
+export const PLUGIN_PACKAGE_NAME = 'dsh-deepseek-vision'
 
 /** Shipped profile template bundles, mirrored from the official
  * dsh-app-boot PROFILE_TEMPLATES (dsh 0.1.0-rc.5/rc.6). */

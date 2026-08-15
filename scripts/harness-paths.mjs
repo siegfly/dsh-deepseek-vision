@@ -223,7 +223,7 @@ export function writeBuildAnchor() {
   }
   const facts = harnessVersion(located)
   if (facts === undefined) {
-    console.log(`dsh-vl-gateway: WARNING — no dsh version readable from ${located.root}; lib/build-anchor.json not written`)
+    console.log(`dsh-deepseek-vision: WARNING — no dsh version readable from ${located.root}; lib/build-anchor.json not written`)
     return undefined
   }
   const target = join(repoRoot, 'lib', 'build-anchor.json')
@@ -232,7 +232,7 @@ export function writeBuildAnchor() {
 }
 
 function printGuidance() {
-  console.log('dsh-vl-gateway: no harness types found. Provide ONE of:')
+  console.log('dsh-deepseek-vision: no harness types found. Provide ONE of:')
   console.log('  1. $DSH_CHECKOUT pointing at a dsh source checkout;')
   console.log('  2. a local harness-paths.json in this repo: {"checkout": "<path>"} (gitignored);')
   console.log('  3. boot `dsh web` once on this machine (its healed fallback ships the types).')
@@ -246,9 +246,9 @@ function main() {
       process.exit(1)
     }
     const { target, entries, missing } = writeTsconfigPaths()
-    console.log(`dsh-vl-gateway: wrote ${entries} path entries to ${target}`)
+    console.log(`dsh-deepseek-vision: wrote ${entries} path entries to ${target}`)
     if (missing > 0) {
-      console.log(`dsh-vl-gateway: WARNING — ${missing} package type entries could not be resolved; the build will fail on their imports.`)
+      console.log(`dsh-deepseek-vision: WARNING — ${missing} package type entries could not be resolved; the build will fail on their imports.`)
       process.exit(1)
     }
     return
@@ -256,7 +256,7 @@ function main() {
   if (process.argv.includes('--write-anchor')) {
     const stamp = writeBuildAnchor()
     if (stamp !== undefined) {
-      console.log(`dsh-vl-gateway: build anchor stamped: ${stamp.version} (${stamp.kind}) → ${stamp.path}`)
+      console.log(`dsh-deepseek-vision: build anchor stamped: ${stamp.version} (${stamp.kind}) → ${stamp.path}`)
     }
     return
   }

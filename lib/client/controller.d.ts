@@ -9,7 +9,7 @@
  * Namespace and section shape are spelled here rather than imported: a client
  * package must not depend on a Host package (client bundle purity gate).
  *
- * @module dsh-vl-gateway/client/controller
+ * @module dsh-deepseek-vision/client/controller
  */
 import type { SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client';
 import { type CardActions, type CardApi, type CardFieldState, type CardShell } from './form.js';

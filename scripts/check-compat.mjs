@@ -280,7 +280,7 @@ function main() {
   const profilesNodeModules = join(dshHome, 'profiles', 'node_modules')
   const { anchor, rows, exitCode } = assess(profilesNodeModules)
 
-  console.log(`dsh-vl-gateway compatibility check`)
+  console.log(`dsh-deepseek-vision compatibility check`)
   console.log(`  release anchor (committed lib/ built against): dsh ${anchor}`)
   console.log(`  target profile:                               ${profilesNodeModules}`)
   console.log('')

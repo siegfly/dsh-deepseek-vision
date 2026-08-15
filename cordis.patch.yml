@@ -1,4 +1,4 @@
-# dsh-vl-gateway bundle patch: registers the vision gateway route (and its
+# dsh-deepseek-vision bundle patch: registers the vision gateway route (and its
 # settings namespace) into the profile's loader composition.
 #
 # Applied as a bundle layer when the profile lists this package in
@@ -7,4 +7,4 @@
 # own cordis.patch.yml (the user layer) still applies after this file.
 - insert:
     - id: llm-vl-gateway
-      name: dsh-vl-gateway
+      name: dsh-deepseek-vision

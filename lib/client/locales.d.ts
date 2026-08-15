@@ -3,7 +3,7 @@
  * `LocaleNamespaceMap` is what types `PropsLocale<'vl-gateway'>` and
  * `ctx.locale.bind(NS)`.
  *
- * @module dsh-vl-gateway/client/locales
+ * @module dsh-deepseek-vision/client/locales
  */
 export declare const NS = "vl-gateway";
 /** Locale keys this card renders. */

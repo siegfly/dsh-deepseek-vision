@@ -41,7 +41,7 @@ const dshHome = process.argv[3] ?? process.env.DSH_HOME ?? join(os.homedir(), '.
 const profileDir = join(dshHome, 'profiles', profile)
 
 function fail(message) {
-  console.error(`dsh-vl-gateway: ${message}`)
+  console.error(`dsh-deepseek-vision: ${message}`)
   process.exit(1)
 }
 
@@ -53,7 +53,7 @@ function runPnpm(args) {
 }
 
 // 1. Build (committed lib/ exists, but rebuild so a source edit always lands).
-console.log('dsh-vl-gateway: building…')
+console.log('dsh-deepseek-vision: building…')
 execFileSync(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', ['build'], {
   cwd: repo,
   stdio: 'inherit',
@@ -78,7 +78,7 @@ if (checkCode === 2 || checkCode === 3) {
   if (process.env.DSH_VL_GATEWAY_FORCE !== '1') {
     fail('compatibility check failed — the release is unbuilt or its client preset drifted; see README "版本对齐" or set DSH_VL_GATEWAY_FORCE=1 to install anyway')
   }
-  console.log('dsh-vl-gateway: forced install despite the compatibility failure')
+  console.log('dsh-deepseek-vision: forced install despite the compatibility failure')
 } else if (checkCode === 1 && process.env.DSH_VL_GATEWAY_STRICT === '1') {
   fail('target dsh differs from the release anchor — DSH_VL_GATEWAY_STRICT=1 refuses (unset it to install with a warning)')
 }
@@ -95,7 +95,7 @@ mkdirSync(profileDir, { recursive: true })
   const manifestPath = join(profileDir, 'package.json')
   if (!existsSync(manifestPath)) {
     writeFileSync(manifestPath, JSON.stringify(freshManifest(profile), undefined, 2) + '\n')
-    console.log(`dsh-vl-gateway: initialized profile manifest at ${manifestPath}`)
+    console.log(`dsh-deepseek-vision: initialized profile manifest at ${manifestPath}`)
   }
   const patchPath = join(profileDir, 'cordis.patch.yml')
   if (!existsSync(patchPath)) writeFileSync(patchPath, PROFILE_PATCH_TEMPLATE)
@@ -108,7 +108,7 @@ mkdirSync(profileDir, { recursive: true })
 //    report "Already up to date" and keep the stale hardlinked copy — the
 //    remove forces the fresh link. pnpm 11 makes `remove` of a not-yet-
 //    installed dep a hard error, so only remove when a link actually exists.
-console.log(`dsh-vl-gateway: installing into ${profileDir}…`)
+console.log(`dsh-deepseek-vision: installing into ${profileDir}…`)
 const linkPaths = [join(profileDir, 'node_modules', PLUGIN_PACKAGE_NAME), join(dirname(profileDir), 'node_modules', PLUGIN_PACKAGE_NAME)]
 if (linkPaths.some(p => existsSync(p))) runPnpm(['remove', PLUGIN_PACKAGE_NAME])
 const added = spawnSync(cmd, ['add', `file:${repo}`], {
@@ -123,7 +123,7 @@ if (added.status !== 0) {
   if (!linkPaths.some(p => existsSync(p))) {
     fail(`pnpm add file:${repo} failed in ${profileDir} and no plugin link exists`)
   }
-  console.log('dsh-vl-gateway: pnpm exited non-zero (ignored build scripts in the profile tree); the plugin link exists — continuing')
+  console.log('dsh-deepseek-vision: pnpm exited non-zero (ignored build scripts in the profile tree); the plugin link exists — continuing')
 }
 
 // 5. Reconcile `dsh.profile.bundles` like the official `dsh plugin` CLI: a
@@ -144,9 +144,9 @@ if (added.status !== 0) {
   const { manifest: next, changed } = ensureBundle(manifest, PLUGIN_PACKAGE_NAME)
   if (changed) {
     writeFileSync(manifestPath, JSON.stringify(next, undefined, 2) + '\n')
-    console.log(`dsh-vl-gateway: joined the profile bundle stack (dsh.profile.bundles) in ${manifestPath}`)
+    console.log(`dsh-deepseek-vision: joined the profile bundle stack (dsh.profile.bundles) in ${manifestPath}`)
   } else {
-    console.log('dsh-vl-gateway: already listed in dsh.profile.bundles')
+    console.log('dsh-deepseek-vision: already listed in dsh.profile.bundles')
   }
   // Migration: pre-bundle installs appended a managed insert block to the
   // profile's own patch layer; strip it so the bundle layer is the single
@@ -162,8 +162,8 @@ if (added.status !== 0) {
     if (next !== before) {
       writeFileSync(patchPath, next)
       console.log(removed
-        ? `dsh-vl-gateway: migrated — removed the legacy managed block from ${patchPath}`
-        : `dsh-vl-gateway: healed ${patchPath} — restored the empty patch list the dsh loader requires`)
+        ? `dsh-deepseek-vision: migrated — removed the legacy managed block from ${patchPath}`
+        : `dsh-deepseek-vision: healed ${patchPath} — restored the empty patch list the dsh loader requires`)
     }
   }
 }

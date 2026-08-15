@@ -13,7 +13,7 @@
 
 import { defineConfig } from 'tsdown'
 
-const ID = 'dsh-vl-gateway'
+const ID = 'dsh-deepseek-vision'
 
 /** Client platform modules (mirror of the official PLATFORM_MODULES + store exemption). */
 const EXTERNALS = [

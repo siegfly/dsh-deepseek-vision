@@ -10,7 +10,7 @@
  * `api.settings.mutate` (the client `SettingsScope.set` addresses only
  * root-level scalar fields).
  *
- * @module dsh-vl-gateway/client/form
+ * @module dsh-deepseek-vision/client/form
  */
 
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'

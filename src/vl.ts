@@ -7,7 +7,7 @@
  * URL part plus a text instruction. Every major Qwen-VL deployment (DashScope
  * compatible-mode, OpenRouter, self-hosted vLLM) serves this shape.
  *
- * @module dsh-vl-gateway/vl
+ * @module dsh-deepseek-vision/vl
  */
 
 import {

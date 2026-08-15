@@ -8,7 +8,7 @@
  * context windows, retry policy, idle watchdogs — is inherited from the
  * exported `DeepSeekAdapter` class.
  *
- * @module dsh-vl-gateway/gateway
+ * @module dsh-deepseek-vision/gateway
  */
 
 import { DeepSeekAdapter } from '@deepseek-ai/dsh-llm-deepseek'

@@ -1,6 +1,6 @@
 # Version Alignment Policy
 
-How `dsh-vl-gateway` decides whether an install on an arbitrary machine may proceed,
+How `dsh-deepseek-vision` decides whether an install on an arbitrary machine may proceed,
 and when the author must ship a new release.
 
 ## The core promise
