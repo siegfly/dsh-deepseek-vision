@@ -1,7 +1,7 @@
 # dsh-deepseek-vision
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
-[![](https://img.shields.io/badge/release-v0.1.2-5B4CF0?style=flat-square)](./CHANGELOG.md)
+[![](https://img.shields.io/badge/release-v0.1.3-5B4CF0?style=flat-square)](./CHANGELOG.md)
 [![](https://img.shields.io/badge/verified-101%20tests-2EA44F?style=flat-square)](./tests)
 [![](https://img.shields.io/badge/coverage-97%25-brightgreen?style=flat-square)](./vitest.config.ts)
 [![](https://img.shields.io/badge/license-MIT-0B7285?style=flat-square)](./LICENSE)
