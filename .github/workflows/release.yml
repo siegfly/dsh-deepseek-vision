@@ -33,6 +33,11 @@ jobs:
           registry-url: https://registry.npmjs.org
       - name: Clone official dsh checkout (shallow)
         run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$GITHUB_WORKSPACE/dsh"
+      - name: Build the official checkout (a fresh clone ships no lib/types — the plugin compiles against them)
+        run: |
+          cd "$GITHUB_WORKSPACE/dsh"
+          pnpm install --frozen-lockfile
+          pnpm build
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test

@@ -29,6 +29,11 @@ jobs:
           node-version: 22
       - name: Clone official dsh checkout (shallow)
         run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$GITHUB_WORKSPACE/dsh"
+      - name: Build the official checkout (a fresh clone ships no lib/types — the plugin compiles against them)
+        run: |
+          cd "$GITHUB_WORKSPACE/dsh"
+          pnpm install --frozen-lockfile
+          pnpm build
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
@@ -65,6 +70,13 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/fake-home/profiles/web"
           cd "$GITHUB_WORKSPACE/fake-home/profiles"
           pnpm init >/dev/null
+          # The launcher writes this file for real profiles; writing it makes
+          # this directory a STANDALONE pnpm workspace (otherwise pnpm walks up
+          # into the plugin repo's own workspace and stores the tree there).
+          # autoInstallPeers + hoistPattern '*' reproduce the launcher-healed
+          # fallback's flat closure — the real heal links the launcher's whole
+          # dependency tree flat, which no pnpm default reproduces on its own.
+          printf 'packages:\n  - .\n\nnodeLinker: hoisted\nhoistPattern:\n  - '"'"'*'"'"'\nautoInstallPeers: true\n' > pnpm-workspace.yaml
           # pnpm exits non-zero with ERR_PNPM_IGNORED_BUILDS on dsh's native
           # toolchain deps even though the tree installs; assert on the tree
           # itself instead of the exit code.
