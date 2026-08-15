@@ -92,8 +92,9 @@ credential-ref（环境变量名），凭据经 dsh 的 credentials seam 解析�
 | `vl.maxCacheEntries` | `64` | 进程内描述缓存容量（LRU） |
 | `vl.onFailure` | `fail` | `fail`=描述失败整个请求失败；`placeholder`=降级为文字占位继续 |
 
-`llm-vl-gateway` 也是一个 settings namespace，所以也可以在 Web Models 页 /
-`settings.yaml` 里改（`deepseek` 子段由可配置 provider 目录接管展示）。
+`llm-vl-gateway` 也是一个 settings namespace，所以有三个编辑入口：**设置 → 插件 → 插件配置**
+的"DeepSeek + Vision（视觉语言桥接）"卡片（`vl.*` 全字段 + VL 密钥）、Web Models 页
+（`deepseek.*` 子段由可配置 provider 目录接管展示）、`settings.yaml`（两个子段都可写）。
 
 示例（cordis.patch.yml 行内配置，全部可选）：
 
@@ -111,23 +112,37 @@ credential-ref（环境变量名），凭据经 dsh 的 credentials seam 解析�
 
 ## 使用
 
-1. 设置两个 key（`.credentials.yaml` 由 Models 页写，或启动环境变量）；
+1. 设置两个 key：**设置 → 插件 → 插件配置 → "DeepSeek + Vision（视觉语言桥接）"** 卡片里直接填 VL 密钥（写入凭据存储，不出现在任何响应/设置里）；DeepSeek key 沿用现有凭据；
 2. Models 页选择 provider **DeepSeek + Vision**（会话内切换即持久化为默认）；
 3. 聊天窗贴图，发消息——图片自动被描述，DeepSeek 看到的是文字。
+
+插件配置页的这张卡片是本插件的**客户端面**（`dsh.client`）：以官方解耦插件的方式注册进
+`settings.plugin.item` 槽位，编辑 `llm-vl-gateway.vl` 段（端点 / 模型 / 描述提示词 / 超时 /
+缓存 / 失败策略 / 密钥），与官方内置卡片（终端 / Agent 循环 / 网页搜索）同机制、同交互
+（暂存草稿、显示覆盖状态、保存时整体写入）。首次启用客户端面需要**重启一次 dsh web**
+（官方客户端模块扫描按包名缓存，新声明在重启时生效）。
 
 ## 开发
 
 ```powershell
 pnpm test      # vitest；@deepseek-ai/* 经 vitest.config.ts 动态映射到本机
                # ../deepseek-harness 的 workspace 源码（仅测试时）
+pnpm build     # tsc（宿主面 + 客户端面 lib/client/*.js）+ tsdown（lib/client.js
+               # 浏览器 CJS 工厂包，横幅/页脚与官方 tsdown.client 预设一致，
+               # 外部依赖仅平台模块，其余全部内联）
 ```
 
 - `tsconfig.json` 的 `paths` 同样指向 `../deepseek-harness` 的 **已提交 .d.ts**（仅
   构建期类型解析）；产物里的 `@deepseek-ai/*` 导入保持裸说明符，运行时走 profile
   fallback。
+- `tsdown.config.ts` 复刻官方 `packages/client/tsdown.client.ts` 预设的行为（该预设未
+  发布）：`window.__ModuleLoader__.load({id, factory})` 闭包工厂、平台模块 external
+  （react/slots/runtime/client 等由模块表解析）、其余全部内联；**不 import 官方仓库的
+  任何构建文件**。
 - 如果官方 checkout 与本仓库不在同级目录，改 `tsconfig.json`/`vitest.config.ts`
   里的路径即可（只影响开发，不影响已安装的插件）。
-- 改代码后重新 `pnpm build && pnpm install-profile`（pnpm `file:` 重新硬链接新内容）。
+- 改代码后重新 `pnpm build && pnpm install-profile`（pnpm `file:` 重新硬链接新内容）；
+  新增/变更 `dsh.client` 声明需重启 dsh web。
 
 ## 边界与注意
 

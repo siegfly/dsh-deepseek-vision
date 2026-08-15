@@ -30,7 +30,13 @@ function buildPackageMap(): Map<string, string> {
       if (existsSync(manifestPath)) {
         try {
           const name = JSON.parse(readFileSync(manifestPath, 'utf8')).name as unknown
-          if (typeof name === 'string' && !map.has(name)) map.set(name, full)
+          if (typeof name === 'string' && !map.has(name)) {
+            map.set(name, full)
+            // Client dual-face packages also serve their browser half under
+            // `<name>/client` — map that specifier onto src/client/index.ts.
+            const clientIndex = join(full, 'src', 'client', 'index.ts')
+            if (existsSync(clientIndex)) map.set(`${name}/client`, full)
+          }
         } catch {
           // Not a readable manifest — keep walking.
         }
@@ -49,13 +55,14 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^@deepseek-ai\/([a-z0-9-]+)$/,
+        find: /^@deepseek-ai\/([a-z0-9-]+(?:\/client)?)$/,
         replacement: (specifier: string): string => {
-          const dir = packages.get(specifier)
+          const isClient = specifier.endsWith('/client')
+          const dir = packages.get(isClient ? specifier : specifier)
           if (dir === undefined) {
             throw new Error(`dsh-vl-gateway vitest: no workspace package for ${specifier}`)
           }
-          const index = join(dir, 'src', 'index.ts')
+          const index = join(dir, 'src', isClient ? 'client' : '', 'index.ts')
           return existsSync(index) ? index : dir
         },
       },
