@@ -78,6 +78,8 @@ export declare const Config: z<Config>;
 /**
  * Register the gateway provider route. Per-request connection facts for both
  * legs resolve lazily, so settings edits and credential rotations reach the
- * very next request without restarting anything.
+ * very next request without restarting anything. The route id and selector
+ * label are registration facts the registries capture, so a live change to
+ * them re-registers atomically (a refused swap keeps the previous set).
  */
 export declare function apply(ctx: Context, config: Config): void;

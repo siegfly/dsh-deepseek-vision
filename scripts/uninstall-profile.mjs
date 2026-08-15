@@ -40,7 +40,10 @@ if (existsSync(patchPath)) {
   if (start !== -1) {
     const end = text.indexOf(PATCH_END, start)
     const tail = end === -1 ? text.length : end + PATCH_END.length
-    const next = (text.slice(0, start) + text.slice(tail)).trim() + '\n'
+    const rest = text.slice(0, start) + text.slice(tail)
+    // The patch file is a top-level YAML array: removing the last remaining
+    // block must leave a valid empty list, not a blank file.
+    const next = rest.trim().length === 0 ? '[]\n' : `${rest.trim()}\n`
     writeFileSync(patchPath, next)
     console.log(`dsh-vl-gateway: removed managed patch block from ${patchPath}`)
   }

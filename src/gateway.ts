@@ -30,13 +30,19 @@ export class VisionGatewayAdapter extends DeepSeekAdapter {
   constructor(
     config: DeepSeekAdapterOptions,
     private readonly bridge: ImageBridge,
-    private readonly displayName: string,
+    /**
+     * Live selector label. The registry captures `providerInfo` at
+     * registration, so a rename reaches `listProviders()` only through
+     * `registration.replace()`; this thunk makes that re-capture read the
+     * name in force, not the one from construction.
+     */
+    private readonly displayName: () => string,
   ) {
     super(config)
   }
 
   override providerInfo(provider: string): LlmProviderInfo {
-    return { id: provider, name: this.displayName }
+    return { id: provider, name: this.displayName() }
   }
 
   override async listModels(provider: string): Promise<readonly LlmModelInfo[]> {

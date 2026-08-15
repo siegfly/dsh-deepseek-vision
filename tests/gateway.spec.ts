@@ -60,7 +60,11 @@ async function drain(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[]>
   return chunks
 }
 
-function makeAdapter(port: number, describe: (r: ImageAttachmentRef, data: Uint8Array) => Promise<string>): VisionGatewayAdapter {
+function makeAdapter(
+  port: number,
+  describe: (r: ImageAttachmentRef, data: Uint8Array) => Promise<string>,
+  displayName: () => string = () => 'DeepSeek + Vision',
+): VisionGatewayAdapter {
   const connection: ResolvedDeepSeekOptions = resolveAdapterOptions({
     baseURL: `http://127.0.0.1:${port}`,
     thinking: 'disabled',
@@ -82,7 +86,7 @@ function makeAdapter(port: number, describe: (r: ImageAttachmentRef, data: Uint8
       resolveUserId: () => 'tester' as AnonymousUserId,
     },
     bridge,
-    'DeepSeek + Vision',
+    displayName,
   )
 }
 
@@ -104,6 +108,16 @@ describe('VisionGatewayAdapter', () => {
     await withDeepSeekServer(async (_captured, port) => {
       const adapter = makeAdapter(port, async () => 'desc')
       expect(adapter.providerInfo('deepseek-vision')).toEqual({ id: 'deepseek-vision', name: 'DeepSeek + Vision' })
+    })
+  })
+
+  it('reads the selector label live, so a rename reaches the registry on re-registration', async () => {
+    await withDeepSeekServer(async (_captured, port) => {
+      let name = 'DeepSeek + Vision'
+      const adapter = makeAdapter(port, async () => 'desc', () => name)
+      expect(adapter.providerInfo('deepseek-vision').name).toBe('DeepSeek + Vision')
+      name = 'DeepSeek Vision Renamed'
+      expect(adapter.providerInfo('deepseek-vision').name).toBe('DeepSeek Vision Renamed')
     })
   })
 

@@ -20,6 +20,18 @@ import type {
   SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+// Type-only imports from the in-box card contract (erased before the client
+// purity gate runs): these four shapes are the drift-free official ones, so
+// they are shared rather than re-declared. `CardFieldSpec` stays local — this
+// card's fields live under the `vl` sub-section, so it adds the `path` member.
+import type {
+  CardActions,
+  CardFieldState,
+  CardSecretSpec,
+  CardShell,
+} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
+
+export type { CardActions, CardFieldState, CardSecretSpec, CardShell }
 
 /** Wire face the card writes through: path-addressed settings + credentials. */
 export type CardApi = Pick<ConnectionHandle['api'], 'credentials' | 'settings'>
@@ -39,52 +51,6 @@ export interface CardFieldSpec {
   format: (value: unknown) => string
   /** The write this draft text stages, or undefined when the text is not a value this field accepts. */
   parse: (text: string) => FieldWrite | undefined
-}
-
-/** A control whose value is written outside the settings section (a credential). */
-export interface CardSecretSpec {
-  /** Field name addressing this control inside the card's form. */
-  field: string
-  /** Write the staged text; resolves to whether the Host accepted it. */
-  write: (text: string) => Promise<boolean>
-}
-
-/** One field as a card's control renders it. */
-export interface CardFieldState {
-  /** Draft text the control renders. */
-  text: string
-  /** Whether saving would leave a user-layer entry for this field. */
-  overridden: boolean
-  /** Whether the draft is not a value this field accepts, which blocks saving. */
-  invalid: boolean
-}
-
-/** Form state every plugin card shares. */
-export interface CardShell {
-  /** False while the namespace is not served to this client. */
-  available: boolean
-  /** Whether the Host document accepts writes. */
-  writable: boolean
-  /** Whether the form holds edits that a save would write. */
-  dirty: boolean
-  /** Whether any staged draft is invalid, which blocks the save. */
-  invalid: boolean
-  /** Whether a save is crossing the wire. */
-  saving: boolean
-  /** Whether the last save did not land as staged; cleared by the next edit or save. */
-  failed: boolean
-}
-
-/** The write actions every plugin card's slot entry injects. */
-export interface CardActions {
-  /** Stage draft text for one field. */
-  edit: (field: string, text: string) => void
-  /** Stage a clear, so saving lets the field re-inherit the composition layer. */
-  resetField: (field: string) => void
-  /** Write every staged edit. */
-  save: () => void
-  /** Drop every staged edit. */
-  discard: () => void
 }
 
 /** One field's staged edit. */
@@ -244,6 +210,13 @@ export class CardForm<T> {
   /**
    * Write every staged edit in staging order. The Host response is the only
    * authority on acceptance; drafts survive a refused save.
+   *
+   * Re-seed dependency: after the writes land, the controls re-read their
+   * stored values when the Host forwards the `settings/document-updated`
+   * event through the scope subscription — the path-addressed
+   * `api.settings.mutate` below has no inline re-read like `SettingsScope.set`
+   * does. The forwarded event lands in the same Host settlement, so the
+   * re-seed is a same-tick refresh, not a poll.
    */
   private async save(): Promise<void> {
     const plan = this.plan()

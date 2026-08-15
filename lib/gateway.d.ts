@@ -19,8 +19,21 @@ export declare const GATEWAY_INPUT_MODALITIES: readonly ["text", "image"];
 /** A DeepSeek route that transparently describes images before dispatch. */
 export declare class VisionGatewayAdapter extends DeepSeekAdapter {
     private readonly bridge;
+    /**
+     * Live selector label. The registry captures `providerInfo` at
+     * registration, so a rename reaches `listProviders()` only through
+     * `registration.replace()`; this thunk makes that re-capture read the
+     * name in force, not the one from construction.
+     */
     private readonly displayName;
-    constructor(config: DeepSeekAdapterOptions, bridge: ImageBridge, displayName: string);
+    constructor(config: DeepSeekAdapterOptions, bridge: ImageBridge, 
+    /**
+     * Live selector label. The registry captures `providerInfo` at
+     * registration, so a rename reaches `listProviders()` only through
+     * `registration.replace()`; this thunk makes that re-capture read the
+     * name in force, not the one from construction.
+     */
+    displayName: () => string);
     providerInfo(provider: string): LlmProviderInfo;
     listModels(provider: string): Promise<readonly LlmModelInfo[]>;
     resolveModel(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;

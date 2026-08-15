@@ -96,6 +96,11 @@ credential-ref（环境变量名），凭据经 dsh 的 credentials seam 解析�
 的"DeepSeek + Vision（视觉语言桥接）"卡片（`vl.*` 全字段 + VL 密钥）、Web Models 页
 （`deepseek.*` 子段由可配置 provider 目录接管展示）、`settings.yaml`（两个子段都可写）。
 
+`provider` / `displayName` 是**注册期事实**：在 `settings.yaml` 或设置段里修改会即时生效
+——插件把两个注册表（adapter 路由 + 可配置 provider 目录）原子重注册，不需要重启；
+改成别的插件已占用的路由 id 时两个注册表都保留旧值并在日志里说明原因（被拒的更新不
+会静默）。
+
 示例（cordis.patch.yml 行内配置，全部可选）：
 
 ```yaml
@@ -165,6 +170,12 @@ pnpm build     # harness-paths --write（生成 tsconfig.paths.json，gitignored
   不同 rc（如 rc.5→rc.6）=exit 1（大概率兼容，建议贴图冒烟一次）；版本线不同=exit 2
   （必须重建）。fallback 目录不存在（dsh web 还没启动过）时给出提示。
 
+  此外，当本机有官方源码 checkout（`$DSH_CHECKOUT` 或 `harness-paths.json`）时，检查还会
+  把本仓库 `tsdown.config.ts` 里**冻结复刻**的客户端 bundle 预设（模块表外部依赖清单、
+  purity 正则、`__ModuleLoader__` 交接横幅/页脚）diff 到 checkout 里的官方预设——官方
+  预设未发布，版本号对比看不出这些内容的漂移（新平台模块被内联=双实例风险；purity
+  门禁变化=交叉导入失控）。不一致时 exit 3，先更新复刻再重建。
+
 **目标机器与锚点不一致时重建**（例如官方 `npx @deepseek-ai/dsh web` 装到了新 rc）：
 
 1. 在目标机器拿到对应版本的官方源码（`git clone --branch <对应tag>` 官方仓库），或
@@ -181,5 +192,9 @@ pnpm build     # harness-paths --write（生成 tsconfig.paths.json，gitignored
 - **VL 失败语义**：默认 fail-closed——描述失败（如 key 失效）整个请求以稳定错误码
   （`AUTH`/`TIMEOUT`/`TRANSPORT`…）终止，不静默丢图；`onFailure: placeholder`
   可降级。
+- **图片上限 fast-fail**：描述前按部署图片准入上限（`ctx.attachments.imageLimits`）预检，
+  超限图片在 base64 编码前就以稳定错误码 `IMAGE_TOO_LARGE` 失败（`placeholder` 策略下
+  降级为文字占位），不把几 MB 的 data URL 送进 VL 端点再死。插件不做图片降采样（官方
+  seam 没有公开的降采样能力）；部署上限内的图片仍可能超过 VL 供应商自己的大小上限，
+  建议控制 `vl.timeoutMs` 并留意供应商文档。
 - 描述文本会占用 DeepSeek 的 context（每图几百 token，仅首次计费）。
-- 插件不做图片降采样；超大图建议控制 `vl.timeoutMs` 并留意 VL 供应商的图片大小上限。

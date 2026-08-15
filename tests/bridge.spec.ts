@@ -195,6 +195,53 @@ describe('ImageBridge.rewrite', () => {
     expect(describe).toHaveBeenCalledTimes(5)
   })
 
+  it('fails fast with IMAGE_TOO_LARGE before reading bytes when a reference exceeds the deployment limits', async () => {
+    let reads = 0
+    const bridge = makeBridge(async () => 'never', {
+      attachments: {
+        readImage: async () => {
+          reads += 1
+          throw new Error('must not be read')
+        },
+        imageLimits: {
+          maxImageBytes: 1_000,
+          maxImagesPerMessage: 1,
+          maxMessageImageBytes: 1_000,
+          maxImagePixels: 10_000,
+          mediaTypes: ['image/png'],
+        },
+      } as unknown as AttachmentStore,
+    })
+    const oversized = ref('big', { bytes: 9_999, width: 100, height: 100 })
+    await expect(bridge.rewrite(request([user([image(oversized)])])))
+      .rejects.toMatchObject({ name: 'LlmError', failure: { code: 'IMAGE_TOO_LARGE' } })
+    expect(reads).toBe(0)
+  })
+
+  it('substitutes a placeholder for an oversized image under the placeholder policy', async () => {
+    const bridge = makeBridge(async () => 'never', {
+      onFailure: () => 'placeholder',
+      attachments: {
+        readImage: async () => {
+          throw new Error('must not be read')
+        },
+        imageLimits: {
+          maxImageBytes: 1_000,
+          maxImagesPerMessage: 1,
+          maxMessageImageBytes: 1_000,
+          maxImagePixels: 10_000,
+          mediaTypes: ['image/png'],
+        },
+      } as unknown as AttachmentStore,
+    })
+    const oversized = ref('big', { bytes: 9_999, width: 100, height: 100 })
+    const rewritten = await bridge.rewrite(request([user([image(oversized)])]))
+    expect(rewritten.messages[0]!.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('description unavailable: image big exceeds the deployment image limits'),
+    })
+  })
+
   it('never mutates a frozen request', async () => {
     const bridge = makeBridge(async () => 'content')
     const frozen = Object.freeze({

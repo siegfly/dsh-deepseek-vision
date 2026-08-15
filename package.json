@@ -52,7 +52,15 @@
     "@deepseek-ai/dsh-credentials": "*",
     "@deepseek-ai/dsh-anonymous-user-id": "*",
     "@deepseek-ai/dsh-launch-environment": "*",
-    "@deepseek-ai/dsh-timeout": "*"
+    "@deepseek-ai/dsh-timeout": "*",
+    "@deepseek-ai/dsh-api-remotes": "*",
+    "@deepseek-ai/dsh-client-connection": "*",
+    "@deepseek-ai/dsh-client-locale": "*",
+    "@deepseek-ai/dsh-client-runtime": "*",
+    "@deepseek-ai/dsh-client-ui-settings": "*",
+    "@deepseek-ai/dsh-client-ui-settings-plugins": "*",
+    "@deepseek-ai/dsh-client-ui-slots": "*",
+    "react": "^18.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

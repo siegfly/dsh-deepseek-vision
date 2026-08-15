@@ -53,15 +53,18 @@ export default defineConfig({
   dts: false,
   sourcemap: true,
   clean: false,
-  external: EXTERNALS,
+  deps: {
+    // Platform modules resolve from the loader module table at runtime.
+    neverBundle: EXTERNALS,
+    // Anything not served by the module table must inline: a require() the
+    // table cannot answer is a guaranteed runtime throw.
+    alwaysBundle: (id: string) => !EXTERNALS.includes(id),
+  },
   define: {
     'process.env.NODE_ENV': JSON.stringify(NODE_ENV),
     'import.meta.env.MODE': JSON.stringify(NODE_ENV),
     'import.meta.env': JSON.stringify({ MODE: NODE_ENV }),
   },
-  // Anything not served by the module table must inline: a require() the
-  // table cannot answer is a guaranteed runtime throw.
-  noExternal: (id: string) => (EXTERNALS.includes(id) ? undefined : true),
   plugins: [{
     // Bundle purity gate (build-time mirror of the module-edge rules):
     // platform seed entries stay external, inline-safe wire layers inline,

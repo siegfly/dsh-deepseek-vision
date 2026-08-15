@@ -41,6 +41,16 @@ export declare class ImageBridge {
     constructor(options: ImageBridgeOptions);
     /** Cached (or in-flight) description for one durable attachment. */
     private descriptionFor;
+    /**
+     * Fail fast when a durable reference exceeds the deployment's current image
+     * limits. The store validated the bytes at save time, but limits can tighten
+     * afterwards, and base64-encoding a multi-megabyte raster only to die inside
+     * the VL endpoint wastes memory and hides the cause. The store's limits are
+     * the best public approximation of "what the pipeline can move" — the
+     * harness exposes no downsampling seam, so oversized rasters are refused
+     * with a stable code (`IMAGE_TOO_LARGE`) instead of being shipped.
+     */
+    private assertWithinImageLimits;
     /** Rewrite one content-block array, recursing into tool results. */
     private rewriteBlocks;
     /**

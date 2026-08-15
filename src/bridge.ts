@@ -78,6 +78,7 @@ export class ImageBridge {
     // settings change while the request is in flight or later on.
     const model = this.options.describeModel()
     const pending = (async (): Promise<CachedDescription> => {
+      this.assertWithinImageLimits(ref)
       const stored = await this.options.attachments.readImage(ref, signal)
       const text = await this.options.describe(ref, stored.data, signal)
       return { model, text }
@@ -92,6 +93,26 @@ export class ImageBridge {
       if (this.cache.get(id) === pending) this.cache.delete(id)
     })
     return pending
+  }
+
+  /**
+   * Fail fast when a durable reference exceeds the deployment's current image
+   * limits. The store validated the bytes at save time, but limits can tighten
+   * afterwards, and base64-encoding a multi-megabyte raster only to die inside
+   * the VL endpoint wastes memory and hides the cause. The store's limits are
+   * the best public approximation of "what the pipeline can move" — the
+   * harness exposes no downsampling seam, so oversized rasters are refused
+   * with a stable code (`IMAGE_TOO_LARGE`) instead of being shipped.
+   */
+  private assertWithinImageLimits(ref: ImageAttachmentRef): void {
+    const limits = this.options.attachments.imageLimits
+    if (limits === undefined) return
+    if (ref.bytes <= limits.maxImageBytes && ref.width * ref.height <= limits.maxImagePixels) return
+    throw new LlmError(
+      `image ${String(ref.attachmentId)} exceeds the deployment image limits`
+      + ` (${ref.bytes} bytes, ${ref.width}x${ref.height} px; limits ${limits.maxImageBytes} bytes, ${limits.maxImagePixels} px)`,
+      'IMAGE_TOO_LARGE',
+    )
   }
 
   /** Rewrite one content-block array, recursing into tool results. */

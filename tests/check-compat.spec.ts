@@ -8,7 +8,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  assess, baseOf, compare, installedVersion, SPOT_CHECKS,
+  assess, baseOf, compare, installedVersion, officialExternals, presetDrift,
+  replicaValues, SPOT_CHECKS,
 } from '../scripts/check-compat.mjs'
 
 /** Write one fixture package manifest into a fake fallback directory. */
@@ -70,5 +71,76 @@ describe('fallback assessment', () => {
     const result = assess(dir)
     expect(result.exitCode).toBe(2)
     expect(result.rows.every(row => row.verdict === 'mismatch')).toBe(true)
+  })
+})
+
+/**
+ * Write a fake source checkout whose official preset files mirror this repo's
+ * replica (plus optional mutations), so presetDrift compares the real
+ * tsdown.config.ts against a controllable "official" side.
+ */
+function writeCheckoutFixture(root: string, mutate?: (preset: string[], platform: string[]) => void): void {
+  const replica = replicaValues()
+  const externals = replica.externals
+  if (externals === undefined) throw new Error('fixture: replica externals unreadable')
+  // officialExternals = PLATFORM_MODULES + RUNTIME_STORE_EXEMPTION, and the
+  // exemption is the replica list's last member by construction.
+  const platform = externals.slice(0, -1)
+  const exemption = externals.at(-1) ?? ''
+  const preset: string[] = []
+  const regex = (name: string, value: string | undefined) => {
+    if (value === undefined) throw new Error(`fixture: replica ${name} unreadable`)
+    // The captured value is the verbatim regex-literal body; write it back
+    // exactly so the extractor reads what the real source would carry.
+    preset.push(`export const ${name} = /${value}/`)
+  }
+  regex('INLINE_SAFE', replica.inlineSafe)
+  preset.push(`const VENDORED_LIBRARY = /${replica.vendoredLibrary ?? ''}/`)
+  preset.push(`const GENERATED_REMOTE = /${replica.generatedRemote ?? ''}/`)
+  preset.push(`const RUNTIME_STORE_EXEMPTION = '${exemption}'`)
+  preset.push('banner: `window.__ModuleLoader__.load({ id: ${JSON.stringify(id)}, factory: (require) => {`,')
+  preset.push("footer: 'return module.exports; } });',")
+  preset.push("intro: 'var module = { exports: {} }; var exports = module.exports;',")
+  mutate?.(preset, platform)
+  const packages = join(root, 'packages', 'client')
+  mkdirSync(join(packages, 'web', 'src'), { recursive: true })
+  writeFileSync(join(packages, 'web', 'src', 'platform.ts'), `export const PLATFORM_MODULES = ${JSON.stringify(platform)} as const\n`)
+  writeFileSync(join(packages, 'tsdown.client.ts'), preset.join('\n') + '\n')
+}
+
+describe('client preset drift', () => {
+  let dir: string
+
+  afterEach(() => {
+    if (dir !== undefined) rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('parses the official externals from a checkout (platform modules + runtime exemption)', () => {
+    dir = mkdtempSync(join(tmpdir(), 'dsh-preset-'))
+    writeCheckoutFixture(dir)
+    const replica = replicaValues()
+    expect(replica.externals?.at(-1)).toBe('@deepseek-ai/dsh-client-runtime/client')
+    expect(officialExternals(dir)).toEqual(replica.externals)
+  })
+
+  it('reports ok when the checkout preset mirrors the replica', () => {
+    dir = mkdtempSync(join(tmpdir(), 'dsh-preset-'))
+    writeCheckoutFixture(dir)
+    const rows = presetDrift(dir)
+    expect(rows.length).toBe(7)
+    expect(rows.every(row => row.verdict === 'ok')).toBe(true)
+  })
+
+  it('flags drifted externals and a drifted purity regex', () => {
+    dir = mkdtempSync(join(tmpdir(), 'dsh-preset-'))
+    writeCheckoutFixture(dir, (preset, platform) => {
+      platform.push('@deepseek-ai/dsh-client-future-ui')
+      preset[1] = 'const VENDORED_LIBRARY = /^@deepseek-ai\\/(cosmokit|schemastery|mylib)(\\/|$)/'
+    })
+    const rows = presetDrift(dir)
+    expect(rows.find(row => row.item.startsWith('client externals'))?.verdict).toBe('drift')
+    expect(rows.find(row => row.item.startsWith('purity: VENDORED_LIBRARY'))?.verdict).toBe('drift')
+    // The untouched items still pass.
+    expect(rows.find(row => row.item.startsWith('purity: INLINE_SAFE'))?.verdict).toBe('ok')
   })
 })

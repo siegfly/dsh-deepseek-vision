@@ -118,10 +118,10 @@ const vlSectionSchema = z.object({
 })
 
 export const Config: z<Config> = z.object({
-  // Composition-time facts materialized with their defaults so the settings
-  // seam's eager schema resolve never sees a required-but-absent field. The
-  // live settings source can therefore differ from these, which is fine:
-  // apply() reads provider/displayName from the composition entry only.
+  // Materialized with their defaults so the settings seam's eager schema
+  // resolve never sees a required-but-absent field. A live settings section
+  // may override these, and apply() re-registers the route/directory when it
+  // does (see ensureRegistrationFacts below).
   provider: z.string().default(DEFAULT_PROVIDER),
   displayName: z.string().default(DEFAULT_DISPLAY_NAME),
   deepseek: DeepSeekSectionSchema.default({}),
@@ -165,13 +165,11 @@ function resolveVlSection(raw: Config): ResolvedVlSection {
 /**
  * Register the gateway provider route. Per-request connection facts for both
  * legs resolve lazily, so settings edits and credential rotations reach the
- * very next request without restarting anything.
+ * very next request without restarting anything. The route id and selector
+ * label are registration facts the registries capture, so a live change to
+ * them re-registers atomically (a refused swap keeps the previous set).
  */
 export function apply(ctx: Context, config: Config): void {
-  const provider = (config.provider ?? DEFAULT_PROVIDER).trim()
-  if (provider.length === 0) throw new Error('llm-vl-gateway: provider must be non-empty')
-  const displayName = (config.displayName ?? '').trim() || DEFAULT_DISPLAY_NAME
-
   // Settings (when mounted) replace the composition entry; everything below
   // reads through this thunk so live snapshots flow into both legs.
   let current: () => Config = () => config
@@ -210,7 +208,7 @@ export function apply(ctx: Context, config: Config): void {
       }
     }
     throw new LlmError(
-      `llm-vl-gateway: no API key for provider route "${provider}"; store ${ref} through the`
+      `llm-vl-gateway: no API key for provider route "${currentProvider()}"; store ${ref} through the`
       + ` credentials service (the web Models page writes it) or export ${ref} in the launching environment`,
       'MISSING_CREDENTIAL',
     )
@@ -260,27 +258,100 @@ export function apply(ctx: Context, config: Config): void {
     onFailure: () => resolveVlSection(current()).onFailure,
   })
 
+  // The route id and selector label read from the LIVE source: they are
+  // captured by both registries, so a settings edit re-registers (below).
+  // The initial call doubles as the load-time validation — an empty provider
+  // fails loudly before anything registers.
+  const currentProvider = (): string => {
+    const value = (current().provider ?? DEFAULT_PROVIDER).trim()
+    if (value.length === 0) throw new Error('llm-vl-gateway: provider must be non-empty')
+    return value
+  }
+  const currentDisplayName = (): string => {
+    const value = (current().displayName ?? '').trim()
+    return value.length === 0 ? DEFAULT_DISPLAY_NAME : value
+  }
+
   const adapter = new VisionGatewayAdapter(
     { options: connectionOptions, resolveApiKey, resolveUserId },
     bridge,
-    displayName,
+    currentDisplayName,
   )
-  ctx.llm.registerConfigurableProviders([
-    { provider, displayName, settingsNs: NS, settingsPath: ['deepseek'] },
-  ])
-  const registration = ctx.llm.registerAdapter([provider], adapter)
-  let registeredPolicy = connectionOptions().retryPolicy
+
+  /** One configurable-provider directory entry, read from the live source. */
+  const directoryEntry = () => ({
+    provider: currentProvider(),
+    displayName: currentDisplayName(),
+    settingsNs: NS,
+    settingsPath: ['deepseek'],
+    // The route exists only because configuration declared it: the gateway
+    // adapter ships nothing under this key on its own.
+    declared: true,
+  })
+
+  const initialEntry = directoryEntry()
+  const directory = ctx.llm.registerConfigurableProviders([initialEntry])
+
+  const registration = ctx.llm.registerAdapter([initialEntry.provider], adapter)
+  let registeredFacts: { provider: string; displayName: string; policy: ResolvedDeepSeekOptions['retryPolicy'] } = {
+    provider: initialEntry.provider,
+    displayName: initialEntry.displayName,
+    policy: connectionOptions().retryPolicy,
+  }
+  let directoryFacts: unknown = initialEntry
+
+  /**
+   * Re-apply every registration-level fact both registries capture: the route
+   * set + selector label + retry policy (adapter registry) and the directory
+   * entry. The two registries have no shared swap, so the directory is
+   * re-applied after the route swap and a refused directory swap rolls the
+   * route back — the old route is this plugin's own, so the revert cannot
+   * conflict. Either both registries advance or neither does, and
+   * `registeredFacts`/`directoryFacts` only advance once both hold the new
+   * set, so returning to a working configuration always re-applies.
+   */
   const ensureRegistrationFacts = (): void => {
-    const policy = connectionOptions().retryPolicy
-    if (deepEqualJson(policy, registeredPolicy)) return
-    registration.replace([provider])
-    registeredPolicy = policy
+    const next = {
+      provider: currentProvider(),
+      displayName: currentDisplayName(),
+      policy: connectionOptions().retryPolicy,
+    }
+    const entry = directoryEntry()
+    if (deepEqualJson(next, registeredFacts) && deepEqualJson(entry, directoryFacts)) return
+    // The adapter registry captures the route set, the selector name, and the
+    // retry policy at registration, so a change to any of them must
+    // re-register. The swap is atomic (same adapter instance, validated
+    // before anything moves): a conflicting route leaves the previous route
+    // serving, and nothing below runs.
+    registration.replace([next.provider])
+    try {
+      // Atomic replace, never dispose-then-register: a provider id another
+      // plugin's directory already declares would otherwise leave the Models
+      // page without this entry. The candidate set is validated first, so a
+      // collision keeps the previous entry serving.
+      directory.replace([entry])
+    } catch (error) {
+      registration.replace([registeredFacts.provider])
+      throw error
+    }
+    registeredFacts = next
+    directoryFacts = entry
   }
 
   installSettingsSection(ctx, NS, Config, config, {
     setSource: (source) => {
       current = source
     },
-    onChange: ensureRegistrationFacts,
+    onChange: () => {
+      // Named here rather than left to the settings watcher so a refusal
+      // reaches the operator as a specific diagnostic naming the plugin —
+      // and the previous route/directory keep serving either way.
+      try {
+        ensureRegistrationFacts()
+      } catch (error) {
+        ctx.logger.error('llm-vl-gateway: keeping the previously registered route and directory after a refused update')
+        ctx.logger.error(error)
+      }
+    },
   })
 }

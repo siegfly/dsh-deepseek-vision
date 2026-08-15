@@ -248,4 +248,61 @@ describe('llm-vl-gateway plugin', () => {
       })
     })
   })
+
+  it('re-registers the route and directory when a live settings section renames the provider, and keeps the old set when a swap is refused', async () => {
+    await withServer({ status: 500, payload: {} }, async (_deepseek, deepseekPort) => {
+      await withServer({ status: 500, payload: {} }, async (_vl, vlPort) => {
+        const watchers: (() => void)[] = []
+        let section: Record<string, unknown> = {}
+        const settings = {
+          register: () => ({
+            get: () => section,
+            watch: (notify: () => void) => {
+              watchers.push(notify)
+              return () => {}
+            },
+          }),
+        }
+        const ctx = new Context()
+        await ctx.plugin(LlmRuntime)
+        const attachments = {
+          readImage: async (r: ImageAttachmentRef) => ({ ref: r, data: new Uint8Array([1]) }),
+        } as unknown as AttachmentStore
+        ctx.provide('attachments', attachments)
+        ctx.provide('settings', settings)
+        const fiber = await ctx.plugin(Object.assign(
+          (inner: Context) => plugin.apply(inner, {
+            deepseek: { baseURL: `http://127.0.0.1:${deepseekPort}` },
+            vl: { baseURL: `http://127.0.0.1:${vlPort}` },
+          }),
+          { inject: plugin.inject },
+        ))
+        try {
+          expect(ctx.llm.listProviders()).toEqual([{ id: 'deepseek-vision', name: 'DeepSeek + Vision' }])
+
+          // A live section rename re-registers both registries without a restart.
+          section = { provider: 'renamed-route', displayName: 'Renamed' }
+          for (const notify of watchers) notify()
+          expect(ctx.llm.listProviders()).toEqual([{ id: 'renamed-route', name: 'Renamed' }])
+          expect(ctx.llm.listConfigurableProviders().map(entry => entry.provider)).toEqual(['renamed-route'])
+
+          // A conflicting rename is refused and contained: the previous route
+          // AND directory keep serving (the directory never advances past a
+          // route the adapter could not take).
+          const intruder = new class extends LlmAdapter {
+            async *stream(): AsyncIterable<StreamChunk> {
+              yield { type: 'finish', reason: { kind: 'stop' } }
+            }
+          }()
+          ctx.llm.registerAdapter(['taken'], intruder)
+          section = { provider: 'taken', displayName: 'Taken' }
+          for (const notify of watchers) notify()
+          expect(ctx.llm.listProviders().map(provider => provider.id).sort()).toEqual(['renamed-route', 'taken'])
+          expect(ctx.llm.listConfigurableProviders().map(entry => entry.provider)).toEqual(['renamed-route'])
+        } finally {
+          await fiber.dispose()
+        }
+      })
+    })
+  })
 })
