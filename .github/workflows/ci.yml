@@ -83,7 +83,7 @@ jobs:
           echo '{"name":"profile-web","private":true}' > "$RUNNER_TEMP/fake-home/profiles/web/package.json"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - name: Tests (client suites self-skip: npm ships the client runtime browser-only)
+      - name: Tests (client suites self-skip, npm ships the client runtime browser-only)
         run: pnpm test
       - name: Compatibility check (target rc.6 vs anchor rc.5 = advisory exit 1)
         run: |
