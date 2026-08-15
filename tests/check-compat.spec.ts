@@ -8,8 +8,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  assess, baseOf, buildAnchorStamp, compare, gradeBuildAnchor, installedVersion,
-  officialExternals, presetDrift, replicaValues, SPOT_CHECKS,
+  assess, baseOf, buildAnchorStamp, compare, extractRegexSource, gradeBuildAnchor,
+  installedVersion, officialExternals, presetDrift, replicaValues, SPOT_CHECKS,
 } from '../scripts/check-compat.mjs'
 
 /** Write one fixture package manifest into a fake fallback directory. */
@@ -179,5 +179,12 @@ describe('client preset drift', () => {
     expect(rows.find(row => row.item.startsWith('purity: VENDORED_LIBRARY'))?.verdict).toBe('drift')
     // The untouched items still pass.
     expect(rows.find(row => row.item.startsWith('purity: INLINE_SAFE'))?.verdict).toBe('ok')
+  })
+
+  it('tolerates CRLF checkout endings when extracting regex-literal sources', () => {
+    const lf = extractRegexSource('export const INLINE_SAFE = /^abc$/\n', 'INLINE_SAFE')
+    const crlf = extractRegexSource('export const INLINE_SAFE = /^abc$/\r\n', 'INLINE_SAFE')
+    expect(lf).toBe('^abc$')
+    expect(crlf).toBe(lf)
   })
 })

@@ -146,7 +146,10 @@ export function extractStringArray(source, name) {
 export function extractRegexSource(source, name) {
   const match = new RegExp(`(?:const|export const) ${name} = /([^\\n]*)`).exec(source)
   if (match === null) return undefined
-  return match[1].replace(/\/$/, '')
+  // A Windows checkout working tree is CRLF: the capture runs to end-of-line,
+  // so trim line-ending whitespace before stripping the closing slash —
+  // otherwise the same literal compares unequal across platforms.
+  return match[1].replace(/\s+$/, '').replace(/\/$/, '')
 }
 
 /** The content of one single-quoted literal (`const NAME = '…'`). */
