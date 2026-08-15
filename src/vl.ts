@@ -24,7 +24,7 @@ export interface VlConnectionFacts {
   apiKey: string
   /** Endpoint base; `/chat/completions` is appended. */
   baseURL: string
-  /** Wire model id the endpoint accepts (e.g. `qwen-vl-max`). */
+  /** Wire model id the endpoint accepts (e.g. `qwen3-vl-flash`). */
   model: string
   /** Text instruction sent beside the image. */
   describePrompt: string

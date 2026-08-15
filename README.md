@@ -86,7 +86,7 @@ credential-ref（环境变量名），凭据经 dsh 的 credentials seam 解析�
 | `deepseek.apiKeyEnv` | `DEEPSEEK_API_KEY` | DeepSeek key |
 | `vl.apiKeyEnv` | `QWEN_VL_API_KEY` | VL 模型 key |
 | `vl.baseURL` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | 任意 OpenAI 兼容 `/chat/completions` 网关 |
-| `vl.model` | `qwen-vl-max` | VL 模型 id |
+| `vl.model` | `qwen3-vl-flash` | VL 模型 id（百炼最新代 flash 档；贴图 OCR 型描述性价比最高。复杂视觉推理可换 `qwen-vl-max`） |
 | `vl.describePrompt` | 详述+逐字提取的英文提示词 | 图片描述指令 |
 | `vl.timeoutMs` | `120000` | 单次描述请求硬超时 |
 | `vl.maxCacheEntries` | `64` | 进程内描述缓存容量（LRU） |
@@ -107,7 +107,7 @@ credential-ref（环境变量名），凭据经 dsh 的 credentials seam 解析�
           reasoningEffort: high
         vl:
           apiKeyEnv: DASHSCOPE_API_KEY
-          model: qwen-vl-max
+          model: qwen3-vl-flash
 ```
 
 ## 使用
