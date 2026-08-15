@@ -28,7 +28,7 @@ jobs:
           version: 11.7.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: https://registry.npmjs.org
       - name: Clone official dsh checkout (shallow)
         run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$RUNNER_TEMP/dsh"
