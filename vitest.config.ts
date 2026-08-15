@@ -7,9 +7,12 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import { harnessRoot, resolvePackageDir } from './scripts/harness-paths.mjs'
+
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 
 const located = harnessRoot()
 if (located === undefined) {
@@ -59,17 +62,17 @@ function runtimeEntry(specifier) {
     // src/index.ts (or a built-only vendor) mirrors the published layout.
   }
   if (isClient) {
-    // Installed fallback: the tsc-emitted `lib/types/client/index.js` is
-    // Node-runnable (the published `lib/client.js` is the browser closure
-    // factory and references `window.__ModuleLoader__` at top level), so it
-    // is the right runtime entry for tests.
+    // Installed fallback: the tsc-emitted `lib/types/client/index.js` (present
+    // in checkout-built layouts, e.g. this machine's healed junction) is
+    // Node-runnable. The npm-published layout carries declarations only — its
+    // sole runnable JS is the browser closure (`lib/client.js`, references
+    // `window.__ModuleLoader__` at top level), which must never be loaded
+    // into Node. Map those specifiers to an import-safe stand-in instead; the
+    // client specs detect the same situation and skip themselves
+    // (tests/support/client-runtime.ts).
     const nodeEntry = join(dir, 'lib', 'types', 'client', 'index.js')
     if (existsSync(nodeEntry)) return nodeEntry
-    const manifest = manifestEntry(dir, './client')
-    if (manifest !== undefined) return manifest
-    const legacy = join(dir, 'lib', 'client.js')
-    if (existsSync(legacy)) return legacy
-    throw new Error(`dsh-vl-gateway vitest: no client runtime entry for ${specifier} in ${dir}`)
+    return join(repoRoot, 'tests', 'support', 'browser-only-client.js')
   }
   // Installed fallback, host half: the published layout is manifest-driven —
   // schemastery ships lib/index.mjs/.cjs, not lib/index.js — so hardcoded

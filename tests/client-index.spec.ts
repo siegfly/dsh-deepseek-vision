@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
 import * as client from '../src/client/index.js'
+import { nodeClientRuntimeAvailable } from './support/client-runtime.js'
 
 interface RegisteredCard {
   options: { name: string; id: string; order: number; locale: string }
@@ -69,7 +70,9 @@ function mountClient(): Promise<{ cards: RegisteredCard[]; face: () => unknown }
   }))
 }
 
-describe('client plugin half', () => {
+// Skipped on npm-only machines: the official client runtime ships browser-only
+// there (see tests/support/client-runtime.ts). Checkout machines run it.
+describe.skipIf(!nodeClientRuntimeAvailable())('client plugin half', () => {
   it('registers one settings.plugin.item card with the gateway face', async () => {
     const { cards, face } = await mountClient()
     expect(cards).toHaveLength(1)

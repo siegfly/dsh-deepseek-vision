@@ -10,6 +10,7 @@ import { CardForm, choiceField, numberField, textField } from '../src/client/for
 import type { CardApi } from '../src/client/form.js'
 import { DEFAULT_VL_API_KEY_REF, VlGatewayCardController } from '../src/client/controller.js'
 import type { VlGatewaySection } from '../src/client/controller.js'
+import { nodeClientRuntimeAvailable } from './support/client-runtime.js'
 
 interface SectionUser {
   vl?: Record<string, unknown>
@@ -110,7 +111,9 @@ function makeForm(overrides: {
   return { form, scope, publish, api, ...spies }
 }
 
-describe('CardForm', () => {
+// Skipped on npm-only machines: the official client runtime ships browser-only
+// there (see tests/support/client-runtime.ts). Checkout machines run it.
+describe.skipIf(!nodeClientRuntimeAvailable())('CardForm', () => {
   it('seeds drafts from the section and marks user-layer presence as overridden', () => {
     const { form, scope, publish } = makeForm()
     publish({
@@ -204,7 +207,7 @@ describe('CardForm', () => {
   })
 })
 
-describe('VlGatewayCardController', () => {
+describe.skipIf(!nodeClientRuntimeAvailable())('VlGatewayCardController', () => {
   it('projects every vl field and the credential state into the card snapshot', async () => {
     const { scope, publish } = makeScope({})
     const { api, credentialsDescribe, credentialsSet } = makeApi()
