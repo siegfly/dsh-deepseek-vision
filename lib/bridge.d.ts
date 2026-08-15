@@ -22,9 +22,9 @@ export interface ImageBridgeOptions {
     /** Current VL model id, stamped into the injected text for transparency. */
     describeModel: () => string;
     /** Bounded per-process cache capacity (one entry per unique attachment). */
-    maxCacheEntries: number;
+    maxCacheEntries: () => number;
     /** `fail` throws (fail-closed); `placeholder` substitutes an error note. */
-    onFailure: VlFailurePolicy;
+    onFailure: () => VlFailurePolicy;
 }
 /**
  * Rewrites images inside one request into text descriptions.

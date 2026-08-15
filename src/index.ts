@@ -118,8 +118,12 @@ const vlSectionSchema = z.object({
 })
 
 export const Config: z<Config> = z.object({
-  provider: z.string(),
-  displayName: z.string(),
+  // Composition-time facts materialized with their defaults so the settings
+  // seam's eager schema resolve never sees a required-but-absent field. The
+  // live settings source can therefore differ from these, which is fine:
+  // apply() reads provider/displayName from the composition entry only.
+  provider: z.string().default(DEFAULT_PROVIDER),
+  displayName: z.string().default(DEFAULT_DISPLAY_NAME),
   deepseek: DeepSeekSectionSchema.default({}),
   vl: vlSectionSchema.default({
     apiKeyEnv: DEFAULT_VL_API_KEY_ENV,
@@ -252,8 +256,8 @@ export function apply(ctx: Context, config: Config): void {
       return describeImage({ ref, data, facts, signal })
     },
     describeModel: () => resolveVlSection(current()).model,
-    maxCacheEntries: resolveVlSection(current()).maxCacheEntries,
-    onFailure: resolveVlSection(current()).onFailure,
+    maxCacheEntries: () => resolveVlSection(current()).maxCacheEntries,
+    onFailure: () => resolveVlSection(current()).onFailure,
   })
 
   const adapter = new VisionGatewayAdapter(

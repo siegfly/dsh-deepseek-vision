@@ -72,8 +72,8 @@ function makeAdapter(port: number, describe: (r: ImageAttachmentRef, data: Uint8
     attachments,
     describe,
     describeModel: () => 'qwen-vl-max',
-    maxCacheEntries: 4,
-    onFailure: 'fail',
+    maxCacheEntries: () => 4,
+    onFailure: () => 'fail',
   })
   return new VisionGatewayAdapter(
     {

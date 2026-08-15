@@ -34,6 +34,8 @@ function Field(props: {
   overridden: boolean
   invalid: boolean
   disabled: boolean
+  /** Hide the reset control — write-only fields (the credential) have no stored value to reset to. */
+  noReset?: boolean
   type?: 'text' | 'number' | 'password' | 'select'
   choices?: readonly string[]
   onEdit: (text: string) => void
@@ -44,14 +46,16 @@ function Field(props: {
       <div className="vlgt-field-head">
         <label className="vlgt-label" htmlFor={props.id}>{props.label}</label>
         {props.overridden && <span className="vlgt-badge">{props.overriddenLabel}</span>}
-        <button
-          type="button"
-          className="vlgt-reset"
-          disabled={props.disabled || (!props.overridden && props.text === '')}
-          onClick={props.onReset}
-        >
-          {props.resetLabel}
-        </button>
+        {!props.noReset && (
+          <button
+            type="button"
+            className="vlgt-reset"
+            disabled={props.disabled || (!props.overridden && props.text === '')}
+            onClick={props.onReset}
+          >
+            {props.resetLabel}
+          </button>
+        )}
       </div>
       {props.type === 'select' && props.choices !== undefined
         ? (
@@ -106,12 +110,13 @@ export function VlGatewayCard(props: VlGatewayCardProps) {
         resetLabel={t('reset')}
         invalidLabel={t('invalidNumber')}
         type="password"
+        noReset
         text={state.apiKey.text}
         overridden={state.apiKey.overridden}
         invalid={state.apiKey.invalid}
         disabled={!state.apiKeyWritable}
         onEdit={text => { props.edit('apiKey', text) }}
-        onReset={() => { props.resetField('apiKey') }}
+        onReset={() => { props.edit('apiKey', '') }}
       />
       <div className="vlgt-hint">{state.apiKeyConfigured ? t('apiKeySet') : t('apiKeyUnset')}</div>
 

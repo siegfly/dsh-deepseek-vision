@@ -51,8 +51,8 @@ function makeBridge(
     attachments,
     describe,
     describeModel: () => 'qwen-vl-max',
-    maxCacheEntries: 4,
-    onFailure: 'fail',
+    maxCacheEntries: () => 4,
+    onFailure: () => 'fail',
     ...overrides,
   })
 }
@@ -130,11 +130,26 @@ describe('ImageBridge.rewrite', () => {
   it('substitutes a placeholder when onFailure is placeholder', async () => {
     const bridge = makeBridge(async () => {
       throw new LlmError('vl down', 'TRANSPORT')
-    }, { onFailure: 'placeholder' })
+    }, { onFailure: () => 'placeholder' })
     const rewritten = await bridge.rewrite(request([user([image(IMAGE_A)])]))
     expect(rewritten.messages[0]!.content[0]).toMatchObject({
       type: 'text',
       text: expect.stringContaining('description unavailable: vl down'),
+    })
+  })
+
+  it('re-reads the live failure policy on every rewrite (settings edits reach the next request)', async () => {
+    let policy: 'fail' | 'placeholder' = 'fail'
+    const bridge = makeBridge(async () => {
+      throw new LlmError('boom', 'AUTH')
+    }, { onFailure: () => policy })
+    await expect(bridge.rewrite(request([user([image(IMAGE_A)])])))
+      .rejects.toMatchObject({ name: 'LlmError', failure: { code: 'AUTH' } })
+    policy = 'placeholder'
+    const rewritten = await bridge.rewrite(request([user([image(IMAGE_A)])]))
+    expect(rewritten.messages[0]!.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('description unavailable: boom'),
     })
   })
 
@@ -148,7 +163,7 @@ describe('ImageBridge.rewrite', () => {
 
   it('evicts the oldest cached entry past the capacity', async () => {
     const describe = vi.fn(async (r) => `desc-${r.attachmentId}`)
-    const bridge = makeBridge(describe, { maxCacheEntries: 2 })
+    const bridge = makeBridge(describe, { maxCacheEntries: () => 2 })
     const ids = ['a', 'b', 'c']
     for (const id of ids) await bridge.rewrite(request([user([image(ref(id))])]))
     expect(describe).toHaveBeenCalledTimes(3)

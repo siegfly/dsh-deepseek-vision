@@ -26,9 +26,9 @@ export interface ImageBridgeOptions {
   /** Current VL model id, stamped into the injected text for transparency. */
   describeModel: () => string
   /** Bounded per-process cache capacity (one entry per unique attachment). */
-  maxCacheEntries: number
+  maxCacheEntries: () => number
   /** `fail` throws (fail-closed); `placeholder` substitutes an error note. */
-  onFailure: VlFailurePolicy
+  onFailure: () => VlFailurePolicy
 }
 
 /** Render one image block's replacement text. */
@@ -67,7 +67,7 @@ export class ImageBridge {
       const stored = await this.options.attachments.readImage(ref, signal)
       return this.options.describe(ref, stored.data, signal)
     })()
-    if (this.cache.size >= this.options.maxCacheEntries) {
+    if (this.cache.size >= this.options.maxCacheEntries()) {
       const oldest = this.cache.keys().next().value
       if (oldest !== undefined) this.cache.delete(oldest)
     }
@@ -92,7 +92,7 @@ export class ImageBridge {
           const description = await this.descriptionFor(block.attachment, signal)
           text = formatDescription(block.attachment, description, this.options.describeModel())
         } catch (error) {
-          if (this.options.onFailure === 'placeholder') {
+          if (this.options.onFailure() === 'placeholder') {
             const reason = error instanceof Error ? error.message : String(error)
             text = `[Image: ${block.attachment.mediaType} — description unavailable: ${reason}]`
           } else {

@@ -10,7 +10,12 @@
  * @module dsh-vl-gateway/vl
  */
 
-import { attributionHeaders, LlmError } from '@deepseek-ai/dsh-llm'
+import {
+  attributionHeaders,
+  isContextWindowExceededError,
+  isQuotaExceededError,
+  LlmError,
+} from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 
 /** Per-call connection facts for the VL endpoint, resolved by the plugin. */
@@ -36,11 +41,15 @@ export interface VlDescribeInput {
   signal?: AbortSignal
 }
 
-/** Map an HTTP status to a stable harness error code (mirrors llm-deepseek). */
-function statusCode(status: number): string {
+/** Map an HTTP status + provider error detail to a stable harness error code (mirrors llm-deepseek). */
+function statusCode(status: number, detail: string): string {
   if (status === 401 || status === 403) return 'AUTH'
+  if (isQuotaExceededError(detail)) return 'QUOTA'
   if (status === 429) return 'RATE_LIMIT'
-  if (status === 400) return 'INVALID_REQUEST'
+  if (status === 400) {
+    if (isContextWindowExceededError(detail)) return 'CONTEXT_WINDOW_EXCEEDED'
+    return 'INVALID_REQUEST'
+  }
   if (status >= 500) return 'SERVER'
   return `HTTP_${status}`
 }
@@ -127,21 +136,36 @@ export async function describeImage(input: VlDescribeInput): Promise<string> {
 
   if (!response.ok) {
     let message = `vision API error (HTTP ${response.status})`
+    let detail = ''
     try {
       const parsed = await response.json() as WireErrorBody
-      if (typeof parsed.error?.message === 'string' && parsed.error.message.length > 0) {
-        message = parsed.error.message
+      const error = parsed.error
+      if (typeof error?.message === 'string' && error.message.length > 0) {
+        message = error.message
       }
+      detail = [error?.code, error?.type, error?.message].filter(Boolean).join(' ')
     } catch {
       // A malformed error body must not mask the HTTP status.
     }
-    throw new LlmError(message, statusCode(response.status), { status: response.status })
+    throw new LlmError(message, statusCode(response.status, detail), { status: response.status })
   }
 
   let payload: WireResponseBody
   try {
     payload = await response.json() as WireResponseBody
   } catch (error) {
+    // A timeout or caller abort can land while the body is still being read;
+    // classify it like the fetch phase instead of masking it as a bad body.
+    if (signal?.aborted) {
+      throw new LlmError('vision description aborted by caller', 'ABORTED', { cause: error })
+    }
+    if (upstream.aborted) {
+      throw new LlmError(
+        `vision description timed out after ${facts.timeoutMs}ms (model ${facts.model})`,
+        'TIMEOUT',
+        { cause: error },
+      )
+    }
     throw new LlmError(
       `vision API returned an unreadable body for model ${facts.model}`,
       'EMPTY_RESPONSE',

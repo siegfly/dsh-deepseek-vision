@@ -124,6 +124,19 @@ describe('describeImage', () => {
     )
   })
 
+  it('classifies an exhausted-quota provider body as QUOTA (mirrors llm-deepseek)', async () => {
+    await withServer(
+      (captured, res) => {
+        res.writeHead(402, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ error: { code: 'insufficient_quota', message: 'account quota exhausted' } }))
+      },
+      async (_captured, port) => {
+        await expect(describeImage({ ref: REF, data: new Uint8Array(), facts: factsAt(port) }))
+          .rejects.toMatchObject({ failure: { code: 'QUOTA' } })
+      },
+    )
+  })
+
   it('maps an empty content body to EMPTY_RESPONSE', async () => {
     await withServer(
       (captured, res) => {

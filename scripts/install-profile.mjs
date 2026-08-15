@@ -35,8 +35,9 @@ function fail(message) {
   process.exit(1)
 }
 
+const cmd = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+
 function runPnpm(args) {
-  const cmd = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
   const result = spawnSync(cmd, args, { cwd: profileDir, stdio: 'inherit', shell: process.platform === 'win32' })
   if (result.status !== 0) fail(`pnpm ${args.join(' ')} failed in ${profileDir}`)
 }
@@ -54,7 +55,15 @@ if (!existsSync(profileDir)) fail(`profile ${profile} not found at ${profileDir}
 
 // 3. Install the plugin into the profile (pnpm hoisted linker; the healed
 //    $DSH_HOME/profiles/node_modules fallback resolves all @deepseek-ai peers).
+//    Remove first: pnpm keys `file:` packages by spec + version, so a rebuild
+//    with an unchanged version would report "Already up to date" and keep the
+//    stale hardlinked copy — the remove forces the fresh link.
 console.log(`dsh-vl-gateway: installing into ${profileDir}…`)
+spawnSync(cmd, ['remove', 'dsh-vl-gateway'], {
+  cwd: profileDir,
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+}) // a not-yet-installed dep is a no-op; failures surface through the add below
 runPnpm(['add', `file:${repo}`])
 
 // 4. Ensure the loader row exists in the profile's patch layer. The row makes
