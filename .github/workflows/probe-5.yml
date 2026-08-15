@@ -1,0 +1,11 @@
+name: probe-5
+
+on: push
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    env:
+      DSH_CHECKOUT: ${{ runner.temp }}/dsh
+    steps:
+      - run: echo probe-5-ok

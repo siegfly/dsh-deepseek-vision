@@ -1,0 +1,14 @@
+name: probe-6
+
+on: push
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compatibility check (0 = match; 1 = advisory; >=2 = refuse)
+        run: |
+          node scripts/check-compat.mjs
+          code=$?
+          if [ "$code" -gt 1 ]; then exit "$code"; fi
+      - run: echo probe-6-ok
