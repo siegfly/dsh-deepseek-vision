@@ -125,22 +125,26 @@ credential-ref（环境变量名），凭据经 dsh 的 credentials seam 解析�
 ## 开发
 
 ```powershell
-pnpm test      # vitest；@deepseek-ai/* 经 vitest.config.ts 动态映射到本机
-               # ../deepseek-harness 的 workspace 源码（仅测试时）
-pnpm build     # tsc（宿主面 + 客户端面 lib/client/*.js）+ tsdown（lib/client.js
+pnpm test      # vitest；@deepseek-ai/* 经 vitest.config.ts + scripts/harness-paths.mjs
+               # 解析到 harness 类型/源码（仅测试时）
+pnpm build     # harness-paths --write（生成 tsconfig.paths.json，gitignored）
+               # + tsc（宿主面 + 客户端面 lib/client/*.js）+ tsdown（lib/client.js
                # 浏览器 CJS 工厂包，横幅/页脚与官方 tsdown.client 预设一致，
                # 外部依赖仅平台模块，其余全部内联）
 ```
 
-- `tsconfig.json` 的 `paths` 同样指向 `../deepseek-harness` 的 **已提交 .d.ts**（仅
-  构建期类型解析）；产物里的 `@deepseek-ai/*` 导入保持裸说明符，运行时走 profile
-  fallback。
+- **harness 类型从哪来**（`scripts/harness-paths.mjs`，仓库内唯一的解析缝，不硬编码任何
+  路径）按序取一个：`$DSH_CHECKOUT` 环境变量（指向官方源码 checkout）→ 本仓库根目录
+  的 `harness-paths.json`（`{"checkout": "<路径>"}`，gitignored，机器私有）→ 本机**已
+  安装的 dsh**（`$DSH_HOME/profiles/node_modules` healed fallback，自带提交的
+  `lib/types/*.d.ts`，`npx @deepseek-ai/dsh web` 的机器同样适用）。三者都没有时构建/
+  测试会给出指引并停止。
+- 产物里的 `@deepseek-ai/*` 导入保持裸说明符，运行时走 profile fallback —— 类型解析
+  缝只影响开发，不影响已安装的插件。
 - `tsdown.config.ts` 复刻官方 `packages/client/tsdown.client.ts` 预设的行为（该预设未
   发布）：`window.__ModuleLoader__.load({id, factory})` 闭包工厂、平台模块 external
   （react/slots/runtime/client 等由模块表解析）、其余全部内联；**不 import 官方仓库的
   任何构建文件**。
-- 如果官方 checkout 与本仓库不在同级目录，改 `tsconfig.json`/`vitest.config.ts`
-  里的路径即可（只影响开发，不影响已安装的插件）。
 - 改代码后重新 `pnpm build && pnpm install-profile`（pnpm `file:` 重新硬链接新内容）；
   新增/变更 `dsh.client` 声明需重启 dsh web。
 
@@ -163,8 +167,9 @@ pnpm build     # tsc（宿主面 + 客户端面 lib/client/*.js）+ tsdown（lib
 
 **目标机器与锚点不一致时重建**（例如官方 `npx @deepseek-ai/dsh web` 装到了新 rc）：
 
-1. 在目标机器拿到对应版本的官方源码：`git clone --branch <对应tag> https://github.com/deepseek-ai/deepseek-harness`（或用该机器 npx 缓存里的 `lib/types`）；
-2. 把本仓库 `tsconfig.json` / `vitest.config.ts` 里的 `../deepseek-harness` 路径改指到它；
+1. 在目标机器拿到对应版本的官方源码（`git clone --branch <对应tag>` 官方仓库），或
+   直接利用该机器已安装 dsh 的类型（上面的第三种解析来源，无需 clone）；
+2. 若 clone 了源码：设置 `$DSH_CHECKOUT=<源码路径>` 或写本仓库 `harness-paths.json`；
 3. `pnpm install && pnpm build && pnpm test`，然后 `node scripts/install-profile.mjs`；
 4. 把 `dshCompat.anchorVersion` 更新为新的锚点并打对应 tag。
 

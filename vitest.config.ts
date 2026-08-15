@@ -1,70 +1,51 @@
 /**
- * Test-only module resolution: maps every `@deepseek-ai/*` specifier onto the
- * sibling deepseek-harness checkout's workspace sources. The checkout path is
- * a dev-time reference only — at runtime the plugin resolves those packages
- * through the profile's healed module fallback (see README), never through
- * this file.
+ * Test-only module resolution: every `@deepseek-ai/*` specifier maps onto the
+ * harness sources/types through scripts/harness-paths.mjs — the single
+ * resolution seam. Nothing in this repo hardcodes a checkout path: the seam
+ * resolves $DSH_CHECKOUT > a local (gitignored) harness-paths.json > the
+ * machine's installed dsh (its healed module fallback).
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
+import { harnessRoot, resolvePackageDir } from './scripts/harness-paths.mjs'
 
-const HARNESS = fileURLToPath(new URL('../deepseek-harness', import.meta.url))
+const located = harnessRoot()
+if (located === undefined) {
+  throw new Error(
+    'dsh-vl-gateway vitest: no harness types found — set $DSH_CHECKOUT, create a local '
+    + 'harness-paths.json, or boot `dsh web` once on this machine (see README).',
+  )
+}
+console.log(`dsh-vl-gateway vitest: harness source ${located.root} (${located.kind})`)
 
-/** Package name → workspace source directory, indexed from package.json names. */
-function buildPackageMap(): Map<string, string> {
-  const map = new Map<string, string>()
-  const visit = (dir: string, depth: number): void => {
-    let entries
-    try {
-      entries = readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name === 'node_modules') continue
-      const full = join(dir, entry.name)
-      const manifestPath = join(full, 'package.json')
-      if (existsSync(manifestPath)) {
-        try {
-          const name = JSON.parse(readFileSync(manifestPath, 'utf8')).name as unknown
-          if (typeof name === 'string' && !map.has(name)) {
-            map.set(name, full)
-            // Client dual-face packages also serve their browser half under
-            // `<name>/client` — map that specifier onto src/client/index.ts.
-            const clientIndex = join(full, 'src', 'client', 'index.ts')
-            if (existsSync(clientIndex)) map.set(`${name}/client`, full)
-          }
-        } catch {
-          // Not a readable manifest — keep walking.
-        }
-      }
-      if (depth > 0) visit(full, depth - 1)
+/** Package specifier → runtime entry file (dev source when available, else built lib). */
+function runtimeEntry(specifier) {
+  const dir = resolvePackageDir(specifier)
+  if (dir === undefined) {
+    throw new Error(`dsh-vl-gateway vitest: no workspace package for ${specifier}`)
+  }
+  const isClient = specifier.endsWith('/client')
+  if (located.kind === 'checkout') {
+    const dev = isClient ? join(dir, 'src', 'client', 'index.ts') : join(dir, 'src', 'index.ts')
+    if (existsSync(dev)) return dev
+  }
+  if (isClient) {
+    for (const candidate of ['lib/types/client/index.js', 'lib/client.js']) {
+      const entry = join(dir, candidate)
+      if (existsSync(entry)) return entry
     }
   }
-  visit(join(HARNESS, 'packages'), 2)
-  visit(join(HARNESS, 'vendor'), 1)
-  return map
+  return join(dir, 'lib', 'index.js')
 }
-
-const packages = buildPackageMap()
 
 export default defineConfig({
   resolve: {
     alias: [
       {
         find: /^@deepseek-ai\/([a-z0-9-]+(?:\/client)?)$/,
-        replacement: (specifier: string): string => {
-          const isClient = specifier.endsWith('/client')
-          const dir = packages.get(isClient ? specifier : specifier)
-          if (dir === undefined) {
-            throw new Error(`dsh-vl-gateway vitest: no workspace package for ${specifier}`)
-          }
-          const index = join(dir, 'src', isClient ? 'client' : '', 'index.ts')
-          return existsSync(index) ? index : dir
-        },
+        replacement: (specifier) => runtimeEntry(specifier),
       },
     ],
   },

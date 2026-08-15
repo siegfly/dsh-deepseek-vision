@@ -2,3 +2,7 @@ node_modules/
 *.tsbuildinfo
 *.log
 .DS_Store
+
+# Machine-local harness type resolution (see scripts/harness-paths.mjs):
+harness-paths.json
+tsconfig.paths.json
