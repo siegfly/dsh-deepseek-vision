@@ -98,5 +98,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.spec.ts'],
+    // The install/uninstall round-trip smoke runs `pnpm build` (it rewrites
+    // lib/) and must not race the other test files copying lib/.
+    fileParallelism: false,
   },
 })

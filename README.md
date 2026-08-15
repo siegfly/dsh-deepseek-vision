@@ -2,7 +2,7 @@
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 [![](https://img.shields.io/badge/release-v0.1.1-5B4CF0?style=flat-square)](./CHANGELOG.md)
-[![](https://img.shields.io/badge/verified-94%20tests-2EA44F?style=flat-square)](./tests)
+[![](https://img.shields.io/badge/verified-95%20tests-2EA44F?style=flat-square)](./tests)
 [![](https://img.shields.io/badge/license-MIT-0B7285?style=flat-square)](./LICENSE)
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
 [![](https://img.shields.io/badge/DSH-Web%20%2B%20Headless-5B4CF0?style=flat-square)](./cordis.patch.yml)

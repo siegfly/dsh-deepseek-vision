@@ -15,8 +15,8 @@
  * second stage.
  */
 
-import { spawn, type ChildProcess } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -244,4 +244,50 @@ describe('real dsh boot smoke', () => {
       rmSync(webHome, { recursive: true, force: true })
     }
   }, 120_000)
+
+  it('installs and uninstalls through the profile scripts, leaving a clean profile that still boots', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-roundtrip-'))
+    const { args, cwd } = launcherInvocation()
+    try {
+      const run = (script: string, extra: string[]) => spawnSync(
+        process.execPath,
+        [join(repoRoot, 'scripts', script), 'web', home, ...extra],
+        { cwd: repoRoot, env: process.env, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 240_000 },
+      )
+
+      // Real install: builds the plugin, initializes the profile layout,
+      // links the package, and joins the bundle stack.
+      const install = run('install-profile.mjs', [])
+      expect(install.status, install.stderr).toBe(0)
+      const manifestPath = join(home, 'profiles', 'web', 'package.json')
+      const installed = JSON.parse(readFileSync(manifestPath, 'utf8'))
+      expect(installed.dsh.profile.bundles).toContain(PLUGIN_PACKAGE_NAME)
+      expect(existsSync(join(home, 'profiles', 'web', 'node_modules', PLUGIN_PACKAGE_NAME))).toBe(true)
+
+      // Real uninstall: removes the link and the bundle-stack entry only.
+      const uninstall = run('uninstall-profile.mjs', [])
+      expect(uninstall.status, uninstall.stderr).toBe(0)
+      const after = JSON.parse(readFileSync(manifestPath, 'utf8'))
+      expect(after.dsh.profile.bundles).not.toContain(PLUGIN_PACKAGE_NAME)
+      expect(after.dependencies ?? {}).toEqual({})
+      expect(existsSync(join(home, 'profiles', 'web', 'node_modules', PLUGIN_PACKAGE_NAME))).toBe(false)
+      // The user patch layer is still a valid empty list — a broken layer is
+      // exactly the crash class the loader refuses to boot.
+      expect(readFileSync(join(home, 'profiles', 'web', 'cordis.patch.yml'), 'utf8')).toContain('[]')
+
+      // The uninstalled profile (template bundles only) still boots.
+      const launched = launch(home, args, cwd, ['--profile', 'web', '--port', '0'])
+      const killTimer = setTimeout(() => launched.child.kill('SIGKILL'), 90_000)
+      try {
+        const url = await waitForWebUrl(launched.stdout, 60_000)
+        expect((await fetch(url)).status).toBe(200)
+      } finally {
+        clearTimeout(killTimer)
+        launched.child.kill('SIGKILL')
+        await launched.closed
+      }
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  }, 240_000)
 })
