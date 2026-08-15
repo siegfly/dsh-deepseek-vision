@@ -56,7 +56,7 @@ profile 并把包名对账进 profile manifest 的 `dsh.profile.bundles` 层栈�
 前置：目标机器已有 dsh 安装并**启动过一次**（本仓库的路径解析在**运行时**依赖 dsh
 profile 的 `profiles/node_modules` healed fallback，构建/测试的类型与运行时入口也优先
 从它取，**不需要官方源码 checkout**）；PATH 里有 `pnpm`（`dsh plugin add` 同样要求）；
-Node ≥ 20；首次 `pnpm install` 需联网拉 devDeps（typescript/vitest/tsdown，不含任何
+Node 22.19+ 或 24+（与官方 dsh 相同）；首次 `pnpm install` 需联网拉 devDeps（typescript/vitest/tsdown，不含任何
 `@deepseek-ai/*`）。已在 fresh clone（无 checkout、无 harness-paths.json）上验证：
 `pnpm install → build → test → check-compat` 全绿；并针对**比锚点更新的官方版本**
 （npm 最新 `dsh@0.1.0-rc.6`）做过全链路验证：构建 / 54 测试通过（2 个客户端套件按
