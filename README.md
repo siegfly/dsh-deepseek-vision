@@ -49,7 +49,10 @@ profile 的 `profiles/node_modules` healed fallback，构建/测试的类型与�
 从它取，**不需要官方源码 checkout**）；PATH 里有 `pnpm`（`dsh plugin add` 同样要求）；
 Node ≥ 20；首次 `pnpm install` 需联网拉 devDeps（typescript/vitest/tsdown，不含任何
 `@deepseek-ai/*`）。已在 fresh clone（无 checkout、无 harness-paths.json）上验证：
-`pnpm install → build → test → check-compat` 全绿。
+`pnpm install → build → test → check-compat` 全绿；并针对**比锚点更新的官方版本**
+（npm 最新 `dsh@0.1.0-rc.6`）做过全链路验证：构建 / 54 测试通过（2 个客户端套件按
+设计跳过，见"开发"）/ `check-compat` exit 1 提示放行 / `install-profile` 装成功（见
+"版本对齐"）。
 
 ```powershell
 # 1. 构建（lib/ 已提交，此步也可省略；改了 src 后必须执行）
