@@ -101,5 +101,16 @@ export default defineConfig({
     // The install/uninstall round-trip smoke runs `pnpm build` (it rewrites
     // lib/) and must not race the other test files copying lib/.
     fileParallelism: false,
+    coverage: {
+      include: ['src/**'],
+      // card.tsx is a presentational React shell with no logic of its own (the
+      // controller/form it wires are fully covered); it is exercised by the
+      // manual UI verification and the real-boot smokes, not by unit tests.
+      exclude: ['src/client/card.tsx'],
+      // Line coverage of the plugin's own code; the browser bundle (lib/) and
+      // the scripts' pure cores are exercised by the same suite but reported
+      // separately in their own domains.
+      reporter: ['text', 'text-summary'],
+    },
   },
 })

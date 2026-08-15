@@ -81,6 +81,16 @@ describe('ImageBridge.rewrite', () => {
     expect(block.content[1]).toEqual(text('log tail'))
   })
 
+  it('passes image-free messages through by reference in a mixed conversation', async () => {
+    const describe = vi.fn(async () => 'content')
+    const bridge = makeBridge(describe)
+    const plain = user([text('keep me')])
+    const rewritten = await bridge.rewrite(request([plain, user([image(IMAGE_A)])]))
+    expect(rewritten.messages[0]).toBe(plain)
+    expect(rewritten.messages[1]!.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('content') })
+    expect(describe).toHaveBeenCalledTimes(1)
+  })
+
   it('returns the SAME options object when no message carries an image', async () => {
     const describe = vi.fn(async () => 'never')
     const bridge = makeBridge(describe)

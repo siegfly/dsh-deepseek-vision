@@ -168,6 +168,39 @@ describe('credentials seam', () => {
     )
   })
 
+  it('fails with MISSING_CREDENTIAL when the VL key exists but the DeepSeek key does not', async () => {
+    process.env.QWEN_VL_API_KEY = 'sk-vl-env'
+    try {
+      await withServer(
+        { status: 500, payload: { error: { message: 'capture only' } } },
+        async (deepseek, deepseekPort) => {
+          await withServer(
+            { status: 200, payload: { choices: [{ message: { content: 'described fine' } }] } },
+            async (vl, vlPort) => {
+              const harness = await makeHarness(deepseekPort, vlPort)
+              try {
+                const chunks = await drain(harness.ctx.llm.stream(imageRequest()))
+                // The VL leg succeeded; the DeepSeek leg's key resolution is
+                // the one that failed — the description was never wasted on a
+                // wire call.
+                expect(chunks.at(-1)).toMatchObject({
+                  type: 'finish',
+                  reason: { kind: 'error', failure: { code: 'MISSING_CREDENTIAL' } },
+                })
+                expect(vl.calls).toBe(1)
+                expect(deepseek.calls).toBe(0)
+              } finally {
+                await harness.dispose()
+              }
+            },
+          )
+        },
+      )
+    } finally {
+      delete process.env.QWEN_VL_API_KEY
+    }
+  })
+
   it('rejects a non-ASCII key as INVALID_CREDENTIAL before any wire call', async () => {
     process.env.DEEPSEEK_API_KEY = 'sk-ds-env'
     process.env.QWEN_VL_API_KEY = 'sk-bad-密钥'

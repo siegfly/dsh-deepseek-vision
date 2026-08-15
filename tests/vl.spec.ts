@@ -197,4 +197,68 @@ describe('describeImage', () => {
       },
     )
   })
+
+  it('falls back to the HTTP status when the error body is not JSON', async () => {
+    await withServer(
+      (_captured, res) => {
+        res.writeHead(500, { 'content-type': 'application/json' })
+        res.end('gateway exploded in prose')
+      },
+      async (_captured, port) => {
+        await expect(describeImage({ ref: REF, data: new Uint8Array(), facts: factsAt(port) }))
+          .rejects.toMatchObject({ failure: { code: 'SERVER', status: 500 } })
+      },
+    )
+  })
+
+  it('maps an unreadable success body to EMPTY_RESPONSE', async () => {
+    await withServer(
+      (_captured, res) => {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end('not json at all')
+      },
+      async (_captured, port) => {
+        await expect(describeImage({ ref: REF, data: new Uint8Array(), facts: factsAt(port) }))
+          .rejects.toMatchObject({ failure: { code: 'EMPTY_RESPONSE' } })
+      },
+    )
+  })
+
+  it('times out while the response body is still streaming', async () => {
+    await withServer(
+      (_captured, res) => {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.write('{"choices":[{"message":')
+        // Never finish the body: the timeout owns termination mid-read.
+      },
+      async (_captured, port) => {
+        await expect(describeImage({
+          ref: REF,
+          data: new Uint8Array(),
+          facts: factsAt(port, { timeoutMs: 100 }),
+        })).rejects.toMatchObject({ failure: { code: 'TIMEOUT' } })
+      },
+    )
+  })
+
+  it('reports a caller abort that lands while reading the body', async () => {
+    await withServer(
+      (_captured, res) => {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.write('{"choices":[{"message":')
+        // Never finish the body; the abort owns termination.
+      },
+      async (_captured, port) => {
+        const controller = new AbortController()
+        const promise = describeImage({
+          ref: REF,
+          data: new Uint8Array(),
+          facts: factsAt(port),
+          signal: controller.signal,
+        })
+        controller.abort(new Error('stopped'))
+        await expect(promise).rejects.toMatchObject({ failure: { code: 'ABORTED' } })
+      },
+    )
+  })
 })
