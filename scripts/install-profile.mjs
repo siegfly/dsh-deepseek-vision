@@ -75,11 +75,13 @@ if (before.includes('llm-vl-gateway')) {
 
 console.log(`
 Done. Next steps:
-1. The running \`dsh web\` hot-reloads the profile patch — the provider
-   "DeepSeek + Vision" should appear in the Models page within seconds.
-2. Make sure the VL key is available: export QWEN_VL_API_KEY (or configure
-   vl.apiKeyEnv/vl.baseURL/vl.model under the llm-vl-gateway settings section).
-3. Select provider "DeepSeek + Vision" (e.g. deepseek-v4-flash) and paste an
-   image into the chat — it is described by the VL model and the text is
-   sent to DeepSeek.
+1. FIRST install on a machine: restart \`dsh web\` so the client module scan
+   picks up the dsh.client declaration (the provider route itself hot-reloads,
+   the client card does not — official per-package cache).
+2. Models page: select provider "DeepSeek + Vision" (e.g. deepseek-v4-flash).
+3. Fill the VL key in Settings → Plugins → plugin config → the
+   "DeepSeek + Vision (vision-language bridge)" card (written to the managed
+   credentials document), or export QWEN_VL_API_KEY in the launching terminal.
+4. Paste an image into the chat — it is described by the VL model and the
+   text is sent to DeepSeek.
 `)
