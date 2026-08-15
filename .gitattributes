@@ -1,0 +1,3 @@
+# Normalize line endings to LF in the repository so clones on any OS are
+# byte-stable; working trees keep each platform's native endings.
+* text=auto

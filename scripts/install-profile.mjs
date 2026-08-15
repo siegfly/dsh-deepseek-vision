@@ -1,16 +1,23 @@
 /**
- * install-profile.mjs — build the plugin and install it into a dsh profile,
- * then ensure the loader patch row exists in the profile's cordis.patch.yml.
+ * install-profile.mjs — build the plugin and install it into a dsh profile
+ * through the OFFICIAL bundle mechanism, without requiring the dsh CLI on
+ * PATH.
  *
- * The profile lives at $DSH_HOME/profiles/<profile> (default: web). This
- * script is equivalent to `dsh plugin --profile <profile> add file:<repo>`
- * plus the patch-row edit, without requiring the dsh CLI on PATH. The install
- * is GATED on scripts/check-compat.mjs first, but only release-integrity
- * defects refuse (unbuilt lib/ = exit 2, drifted client preset = exit 3;
- * DSH_VL_GATEWAY_FORCE=1 overrides): the build above already recompiled the
- * plugin against this machine's own dsh, so target-version differences from
- * the release anchor are advisory (exit 1, proceeds; DSH_VL_GATEWAY_STRICT=1
- * refuses on them for conservative users).
+ * `dsh plugin --profile <profile> add file:<repo>` does three things: it
+ * initializes the profile layout on first use, forwards to pnpm in the
+ * profile directory, and reconciles `dsh.profile.bundles` in the profile
+ * manifest so the loader mounts this package's `dsh.bundle.patch` layer
+ * (cordis.patch.yml, shipped in the package). This script replicates exactly
+ * that: init layout → build → gate → pnpm add → bundle reconcile. It also
+ * migrates away from the LEGACY mechanism (a managed insert block in the
+ * profile's own cordis.patch.yml) by stripping that block when present.
+ *
+ * The install is GATED on scripts/check-compat.mjs first, but only
+ * release-integrity defects refuse (unbuilt lib/ = exit 2, drifted client
+ * preset = exit 3; DSH_VL_GATEWAY_FORCE=1 overrides): the build above already
+ * recompiled the plugin against this machine's own dsh, so target-version
+ * differences from the release anchor are advisory (exit 1, proceeds;
+ * DSH_VL_GATEWAY_STRICT=1 refuses on them for conservative users).
  *
  * Usage:
  *   node scripts/install-profile.mjs [profile] [dshHome]
@@ -18,23 +25,19 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import os from 'node:os'
+import {
+  ensureBundle, freshManifest, PLUGIN_PACKAGE_NAME, PROFILE_PATCH_TEMPLATE,
+  PROFILE_PNPM_WORKSPACE, stripManagedBlock,
+} from './profile-layer.mjs'
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const profile = process.argv[2] ?? 'web'
 const dshHome = process.argv[3] ?? process.env.DSH_HOME ?? join(os.homedir(), '.dsh')
 const profileDir = join(dshHome, 'profiles', profile)
-
-const PATCH_START = '# >>> dsh-vl-gateway (managed by install-profile.mjs)'
-const PATCH_END = '# <<< dsh-vl-gateway'
-const PATCH_BLOCK = `${PATCH_START}
-- insert:
-    - id: llm-vl-gateway
-      name: dsh-vl-gateway
-${PATCH_END}`
 
 function fail(message) {
   console.error(`dsh-vl-gateway: ${message}`)
@@ -80,20 +83,33 @@ if (checkCode === 2 || checkCode === 3) {
 }
 console.log('')
 
-// 3. Profile must exist (a default dsh web install has it; create the layout otherwise).
-if (!existsSync(profileDir)) fail(`profile ${profile} not found at ${profileDir}; boot 'dsh web' once first`)
+// 3. Profile layout, exactly like the official dsh-app-boot initProfile:
+//    manifest + empty user patch layer + pnpm settings. Existing files are
+//    never touched, so re-running is a no-op on an initialized profile. The
+//    healed fallback ($DSH_HOME/profiles/node_modules) itself is
+//    launcher-maintained — a machine still needs to have booted dsh once, and
+//    the build in step 1 already proved it exists.
+mkdirSync(profileDir, { recursive: true })
+{
+  const manifestPath = join(profileDir, 'package.json')
+  if (!existsSync(manifestPath)) {
+    writeFileSync(manifestPath, JSON.stringify(freshManifest(profile), undefined, 2) + '\n')
+    console.log(`dsh-vl-gateway: initialized profile manifest at ${manifestPath}`)
+  }
+  const patchPath = join(profileDir, 'cordis.patch.yml')
+  if (!existsSync(patchPath)) writeFileSync(patchPath, PROFILE_PATCH_TEMPLATE)
+  const workspacePath = join(profileDir, 'pnpm-workspace.yaml')
+  if (!existsSync(workspacePath)) writeFileSync(workspacePath, PROFILE_PNPM_WORKSPACE)
+}
 
-// 4. Install the plugin into the profile (pnpm hoisted linker; the healed
-//    $DSH_HOME/profiles/node_modules fallback resolves all @deepseek-ai peers).
-//    Remove first: pnpm keys `file:` packages by spec + version, so a rebuild
-//    with an unchanged version would report "Already up to date" and keep the
-//    stale hardlinked copy — the remove forces the fresh link. pnpm 11 makes
-//    `remove` of a not-yet-installed dep a hard error, so only remove when a
-//    link actually exists (the project root hoists it into either the profile
-//    dir's node_modules or the parent profiles/ one).
+// 4. Install the plugin into the profile. Remove first: pnpm keys `file:`
+//    packages by spec + version, so a rebuild with an unchanged version would
+//    report "Already up to date" and keep the stale hardlinked copy — the
+//    remove forces the fresh link. pnpm 11 makes `remove` of a not-yet-
+//    installed dep a hard error, so only remove when a link actually exists.
 console.log(`dsh-vl-gateway: installing into ${profileDir}…`)
-const linkPaths = [join(profileDir, 'node_modules', 'dsh-vl-gateway'), join(dirname(profileDir), 'node_modules', 'dsh-vl-gateway')]
-if (linkPaths.some(p => existsSync(p))) runPnpm(['remove', 'dsh-vl-gateway'])
+const linkPaths = [join(profileDir, 'node_modules', PLUGIN_PACKAGE_NAME), join(dirname(profileDir), 'node_modules', PLUGIN_PACKAGE_NAME)]
+if (linkPaths.some(p => existsSync(p))) runPnpm(['remove', PLUGIN_PACKAGE_NAME])
 const added = spawnSync(cmd, ['add', `file:${repo}`], {
   cwd: profileDir,
   stdio: 'inherit',
@@ -109,27 +125,46 @@ if (added.status !== 0) {
   console.log('dsh-vl-gateway: pnpm exited non-zero (ignored build scripts in the profile tree); the plugin link exists — continuing')
 }
 
-// 5. Ensure the loader row exists in the profile's patch layer. The row makes
-//    the running dsh web hot-reload the plugin (config-only HMR on the profile
-//    patch), so no restart is needed.
-const patchPath = join(profileDir, 'cordis.patch.yml')
-const before = existsSync(patchPath) ? readFileSync(patchPath, 'utf8') : '[]\n'
-if (before.includes('llm-vl-gateway')) {
-  console.log('dsh-vl-gateway: patch row already present, leaving it untouched')
-} else {
-  const body = before.trimEnd()
-  const next = body === '[]'
-    ? `${PATCH_BLOCK}\n`
-    : `${body}\n${PATCH_BLOCK}\n`
-  writeFileSync(patchPath, next)
-  console.log(`dsh-vl-gateway: appended loader row to ${patchPath}`)
+// 5. Reconcile `dsh.profile.bundles` like the official `dsh plugin` CLI: a
+//    dependency that declares `dsh.bundle.patch` joins the layer stack. This
+//    package must declare it — otherwise the loader could not mount it.
+{
+  const self = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'))
+  if (self.dsh?.bundle?.patch !== './cordis.patch.yml') {
+    fail('this repo no longer declares dsh.bundle.patch = ./cordis.patch.yml — fix package.json before installing')
+  }
+  const manifestPath = join(profileDir, 'package.json')
+  let manifest
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  } catch (error) {
+    fail(`profile manifest ${manifestPath} is unreadable: ${String(error)}`)
+  }
+  const { manifest: next, changed } = ensureBundle(manifest, PLUGIN_PACKAGE_NAME)
+  if (changed) {
+    writeFileSync(manifestPath, JSON.stringify(next, undefined, 2) + '\n')
+    console.log(`dsh-vl-gateway: joined the profile bundle stack (dsh.profile.bundles) in ${manifestPath}`)
+  } else {
+    console.log('dsh-vl-gateway: already listed in dsh.profile.bundles')
+  }
+  // Migration: pre-bundle installs appended a managed insert block to the
+  // profile's own patch layer; strip it so the bundle layer is the single
+  // mechanism (double registration would mount the plugin twice).
+  const patchPath = join(profileDir, 'cordis.patch.yml')
+  if (existsSync(patchPath)) {
+    const { text, removed } = stripManagedBlock(readFileSync(patchPath, 'utf8'))
+    if (removed) {
+      writeFileSync(patchPath, text)
+      console.log(`dsh-vl-gateway: migrated — removed the legacy managed block from ${patchPath}`)
+    }
+  }
 }
 
 console.log(`
 Done. Next steps:
-1. FIRST install on a machine: restart \`dsh web\` so the client module scan
-   picks up the dsh.client declaration (the provider route itself hot-reloads,
-   the client card does not — official per-package cache).
+1. Restart \`dsh web\` once: the new bundle layer joins the loader composition
+   and the client module scan picks up the dsh.client declaration (official
+   per-package cache).
 2. Models page: select provider "DeepSeek + Vision" (e.g. deepseek-v4-flash).
 3. Fill the VL key in Settings → Plugins → plugin config → the
    "DeepSeek + Vision (vision-language bridge)" card (written to the managed

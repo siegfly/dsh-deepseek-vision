@@ -1,0 +1,50 @@
+name: release
+
+# Publishes a tagged release to npm (with provenance) and creates the GitHub
+# Release. Activate by: creating the GitHub repo, pushing the v* tag, and
+# adding an npm Automation access token as the NPM_TOKEN secret.
+#
+# The build runs in checkout-mode (official source checkout + drift check),
+# so the published lib/ is provably built against the anchor version the
+# tag declares.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      DSH_CHECKOUT: ${{ runner.temp }}/dsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - name: Clone official dsh checkout (shallow)
+        run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$RUNNER_TEMP/dsh"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+      - name: Compatibility check (refuse on stamp/preset integrity failures)
+        run: |
+          node scripts/check-compat.mjs
+          code=$?
+          if [ "$code" -gt 1 ]; then exit "$code"; fi
+      - name: Publish to npm (provenance)
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: GitHub Release
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

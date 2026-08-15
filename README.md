@@ -1,5 +1,8 @@
 # dsh-vl-gateway
 
+[![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
+[![](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
+
 给 DeepSeek Harness 的**外部 provider 插件**：一个"网关"模型路由，让纯文本的
 DeepSeek 编程模型无缝支持聊天窗贴图。
 
@@ -44,6 +47,12 @@ DSH 的消息协议原生支持图片：贴图会先经 apiproxy 的 `prompt` RP
 
 ## 安装
 
+安装走**官方 bundle 机制**（与 `dsh plugin add` 完全相同）：本包在 `package.json`
+里声明 `dsh.bundle.patch`（指向包内附带的 `cordis.patch.yml`），安装时把包链接进
+profile 并把包名对账进 profile manifest 的 `dsh.profile.bundles` 层栈，loader 启动
+时按层挂载——**不需要手工往 `cordis.patch.yml` 加任何行**（旧版本加过的受管块会在
+下次安装/卸载时自动迁移移除）。
+
 前置：目标机器已有 dsh 安装并**启动过一次**（本仓库的路径解析在**运行时**依赖 dsh
 profile 的 `profiles/node_modules` healed fallback，构建/测试的类型与运行时入口也优先
 从它取，**不需要官方源码 checkout**）；PATH 里有 `pnpm`（`dsh plugin add` 同样要求）；
@@ -51,33 +60,31 @@ Node ≥ 20；首次 `pnpm install` 需联网拉 devDeps（typescript/vitest/tsd
 `@deepseek-ai/*`）。已在 fresh clone（无 checkout、无 harness-paths.json）上验证：
 `pnpm install → build → test → check-compat` 全绿；并针对**比锚点更新的官方版本**
 （npm 最新 `dsh@0.1.0-rc.6`）做过全链路验证：构建 / 54 测试通过（2 个客户端套件按
-设计跳过，见"开发"）/ `check-compat` exit 1 提示放行 / `install-profile` 装成功（见
-"版本对齐"）。
+设计跳过，见"开发"）/ `check-compat` exit 1 提示放行 / 安装成功（见"版本对齐"）。
 
 ```powershell
-# 1. 构建（lib/ 已提交，此步也可省略；改了 src 后必须执行）
-pnpm install        # 只装 devDeps（typescript/vitest），不会装 @deepseek-ai/*
-pnpm build
+# 方式 A（推荐，官方 CLI 在 PATH 时）：与官方插件安装完全相同的路径
+dsh plugin --profile web add file:<本仓库路径>     # 未来发布 npm 后：dsh plugin add dsh-vl-gateway
 
-# 2. 安装进 web profile（等价于 dsh plugin --profile web add file:<repo>）+ 写入 patch 行
+# 方式 B（无 CLI 时）：本仓库脚本等价复刻方式 A（init 布局 → pnpm add → bundles 对账）
+pnpm install        # 只装 devDeps（typescript/vitest），不会装 @deepseek-ai/*
 pnpm install-profile          # 或 node scripts/install-profile.mjs [profile] [dshHome]
 ```
 
-`install-profile` 做了两件事：
+两种方式做同样的事：
 
-- `pnpm add file:<repo>`（在 `$DSH_HOME/profiles/web` 里执行）——插件被硬链接进
-  profile 的 node_modules，运行时 `@deepseek-ai/*` 依赖经官方 healed fallback
-  解析到**同一个** dsh 安装（共享同一个 cordis 实例，不会出现双实例问题）；
-- 向 `$DSH_HOME/profiles/web/cordis.patch.yml` 追加一行：
-  ```yaml
-  - insert:
-      - id: llm-vl-gateway
-        name: dsh-vl-gateway
-  ```
-  该文件是**热重载**的（config-only HMR），运行中的 `dsh web` 数秒内自动挂载插件，
-  **不需要重启**。
+- 把 `dsh-vl-gateway` 链接进 profile 的 node_modules（运行时 `@deepseek-ai/*` 依赖经
+  官方 healed fallback 解析到**同一个** dsh 安装，共享同一个 cordis 实例，不会出现
+  双实例问题）；
+- 把 `dsh-vl-gateway` 对账进 profile manifest 的 `dsh.profile.bundles`——loader 按层
+  挂载包内 `cordis.patch.yml` 的 insert 行（注册路由 + 设置段）；旧版写在 profile 自身
+  `cordis.patch.yml` 里的受管块会被自动移除迁移，绝不双挂载；
+- 首次安装时如 profile 布局缺失，按官方 `initProfile` 语义补齐（manifest + 空用户
+  patch 层 + `pnpm-workspace.yaml`），**已存在的文件从不改动**。
 
-卸载：`pnpm uninstall-profile`。
+装完**重启一次 `dsh web`**（bundles 层栈变化 + 客户端模块扫描按包名缓存，首次安装
+必须重启）。卸载：`pnpm uninstall-profile`（或 `dsh plugin --profile web remove
+dsh-vl-gateway`）。
 
 ## 配置
 

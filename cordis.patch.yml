@@ -1,0 +1,10 @@
+# dsh-vl-gateway bundle patch: registers the vision gateway route (and its
+# settings namespace) into the profile's loader composition.
+#
+# Applied as a bundle layer when the profile lists this package in
+# `dsh.profile.bundles` — `dsh plugin add` reconciles that list automatically
+# from the `dsh.bundle.patch` declaration in package.json, and the profile's
+# own cordis.patch.yml (the user layer) still applies after this file.
+- insert:
+    - id: llm-vl-gateway
+      name: dsh-vl-gateway
