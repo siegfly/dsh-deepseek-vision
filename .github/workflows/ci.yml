@@ -28,8 +28,10 @@ jobs:
         with:
           node-version: 22
       - name: Clone official dsh checkout (shallow)
+        shell: bash
         run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$GITHUB_WORKSPACE/dsh"
       - name: Build the official checkout (a fresh clone ships no lib/types — the plugin compiles against them)
+        shell: bash
         run: |
           cd "$GITHUB_WORKSPACE/dsh"
           pnpm install --frozen-lockfile
@@ -38,6 +40,7 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - name: Compatibility check (0 = match; 1 = advisory; >=2 = refuse)
+        shell: bash
         run: |
           code=0
           node scripts/check-compat.mjs || code=$?
@@ -103,6 +106,7 @@ jobs:
       - name: Tests (client suites self-skip, npm ships the client runtime browser-only)
         run: pnpm test
       - name: Compatibility check (target rc.6 vs anchor rc.5 = advisory exit 1)
+        shell: bash
         run: |
           code=0
           node scripts/check-compat.mjs "$DSH_HOME" || code=$?

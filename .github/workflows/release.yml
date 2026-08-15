@@ -32,8 +32,10 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
       - name: Clone official dsh checkout (shallow)
+        shell: bash
         run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$GITHUB_WORKSPACE/dsh"
       - name: Build the official checkout (a fresh clone ships no lib/types — the plugin compiles against them)
+        shell: bash
         run: |
           cd "$GITHUB_WORKSPACE/dsh"
           pnpm install --frozen-lockfile
@@ -42,6 +44,7 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - name: Compatibility check (refuse on stamp/preset integrity failures)
+        shell: bash
         run: |
           code=0
           node scripts/check-compat.mjs || code=$?
