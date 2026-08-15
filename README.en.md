@@ -235,6 +235,10 @@ Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 - **compaction**: inherits the session provider (the gateway route) by default — images
   are rewritten and hit the cache; explicitly pinning compaction to `deepseek-official`
   with images in history fails with `UNSUPPORTED_CONTENT` as before.
+- **image-history sessions after uninstall**: after the plugin is removed, a session whose
+  history contains images cannot switch back to a text-only model (the official
+  `selectModel` gate rejects by `inputModalities` — expected behavior, not data loss);
+  new sessions are unaffected, and reinstalling restores the gateway route.
 - **VL failure semantics**: fail-closed by default — a failed description (e.g. dead key)
   aborts the request with a stable code (`AUTH` / `TIMEOUT` / `TRANSPORT`…) instead of
   silently dropping the image; `onFailure: placeholder` degrades.

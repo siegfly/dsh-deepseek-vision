@@ -215,6 +215,8 @@ pnpm build     # tsc（宿主面 + 客户端面）+ tsdown 浏览器 bundle
 
 - **compaction**：默认继承会话 provider（即网关路由），图片被改写且命中缓存；若把压缩
   策略显式 pin 到 `deepseek-official` 且历史含图，会按原逻辑 `UNSUPPORTED_CONTENT` 失败。
+- **卸载后的含图会话**：卸载插件后，含图历史会话无法切回文本模型（官方 `selectModel`
+  按 `inputModalities` 准入拒绝，属预期行为，不是数据损坏）；新会话不受影响，重装即恢复。
 - **VL 失败语义**：默认 fail-closed——描述失败（如 key 失效）整个请求以稳定错误码
   （`AUTH` / `TIMEOUT` / `TRANSPORT`…）终止，不静默丢图；`onFailure: placeholder` 可降级。
 - **图片上限 fast-fail**：描述前按部署图片准入上限（`ctx.attachments.imageLimits`）预检，
