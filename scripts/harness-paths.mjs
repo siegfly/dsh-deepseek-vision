@@ -133,14 +133,13 @@ export function resolvePackageDir(name, located = harnessRoot()) {
   if (located === undefined) return undefined
   const cacheKey = `${located.kind}\u0000${located.root}\u0000${name}`
   if (manifestCache.has(cacheKey)) return manifestCache.get(cacheKey)
-  let dir
-  if (located.kind === 'installed') {
-    dir = join(located.root, name)
-  } else {
-    // `/client` is a dual-face subpath; the manifest name is the package root.
-    const base = name.endsWith('/client') ? name.slice(0, -'/client'.length) : name
-    dir = discoverInCheckout(located.root, base)
-  }
+  // `/client` is a dual-face subpath: the manifest name is the package root
+  // in BOTH layouts — an installed package dir never contains a `client/`
+  // directory, and a checkout package is discovered by its root manifest.
+  const base = name.endsWith('/client') ? name.slice(0, -'/client'.length) : name
+  const dir = located.kind === 'installed'
+    ? join(located.root, base)
+    : discoverInCheckout(located.root, base)
   const result = dir !== undefined && existsSync(dir) ? dir : undefined
   manifestCache.set(cacheKey, result)
   return result

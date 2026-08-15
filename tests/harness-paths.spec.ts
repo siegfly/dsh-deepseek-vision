@@ -67,6 +67,16 @@ describe('harness-paths seam', () => {
     expect(resolvePackageDir('@deepseek-ai/dsh-llm', located)).toBe(join(fallback, '@deepseek-ai/dsh-llm'))
   })
 
+  it('resolves /client subpaths to the package root in the installed layout too', () => {
+    const fallback = mkdtempSync(join(tmpdir(), 'dsh-fallback-'))
+    dirs.push(fallback)
+    writeInstalledPackage(fallback, '@deepseek-ai/dsh-llm')
+    const located = { root: fallback, kind: 'installed' } as const
+    // The installed dir has no `client/` directory; the subpath must resolve
+    // to the package root, exactly like the checkout branch does.
+    expect(resolvePackageDir('@deepseek-ai/dsh-llm/client', located)).toBe(join(fallback, '@deepseek-ai/dsh-llm'))
+  })
+
   it('prefers an environment checkout over the installed fallback', () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-checkout-'))
     dirs.push(root)
