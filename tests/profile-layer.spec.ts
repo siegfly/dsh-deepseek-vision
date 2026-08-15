@@ -6,8 +6,8 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  ensureBundle, freshManifest, PATCH_END, PATCH_START, PLUGIN_PACKAGE_NAME,
-  removeBundle, stripManagedBlock, templateBundles,
+  ensureArrayDocument, ensureBundle, freshManifest, hasPatchContent, PATCH_END,
+  PATCH_START, PLUGIN_PACKAGE_NAME, removeBundle, stripManagedBlock, templateBundles,
 } from '../scripts/profile-layer.mjs'
 
 describe('template bundles', () => {
@@ -87,5 +87,31 @@ ${PATCH_END}`
     const { text, removed } = stripManagedBlock(`keep: me\n${PATCH_START}\n- insert: []`)
     expect(removed).toBe(true)
     expect(text).toBe('keep: me\n')
+  })
+
+  it('restores the empty list when the remainder is only comments', () => {
+    const header = '# Your patch layer for this dsh profile, applied after every bundle layer:\n# overrides, disables, and insert lists.\n'
+    const { text, removed } = stripManagedBlock(`${header}${block}\n`)
+    expect(removed).toBe(true)
+    expect(text).toBe(`${header}[]\n`)
+  })
+})
+
+describe('patch document healing', () => {
+  it('detects patch content beyond comments and blank lines', () => {
+    expect(hasPatchContent('# only a comment\n')).toBe(false)
+    expect(hasPatchContent('')).toBe(false)
+    expect(hasPatchContent('- id: llm-vl-gateway\n')).toBe(true)
+  })
+
+  it('restores a valid empty-list document from a comments-only file', () => {
+    const header = '# Your patch layer for this dsh profile\n'
+    expect(ensureArrayDocument(header)).toBe(`${header}[]\n`)
+    expect(ensureArrayDocument('')).toBe('[]\n')
+  })
+
+  it('leaves a document that already has content untouched', () => {
+    const text = '# comment\n- id: llm-vl-gateway\n'
+    expect(ensureArrayDocument(text)).toBe(text)
   })
 })

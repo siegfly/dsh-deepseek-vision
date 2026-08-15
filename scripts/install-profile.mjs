@@ -30,7 +30,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import os from 'node:os'
 import {
-  ensureBundle, freshManifest, PLUGIN_PACKAGE_NAME, PROFILE_PATCH_TEMPLATE,
+  ensureBundle, ensureArrayDocument, freshManifest, hasPatchContent,
+  PLUGIN_PACKAGE_NAME, PROFILE_PATCH_TEMPLATE,
   PROFILE_PNPM_WORKSPACE, stripManagedBlock,
 } from './profile-layer.mjs'
 
@@ -149,13 +150,20 @@ if (added.status !== 0) {
   }
   // Migration: pre-bundle installs appended a managed insert block to the
   // profile's own patch layer; strip it so the bundle layer is the single
-  // mechanism (double registration would mount the plugin twice).
+  // mechanism (double registration would mount the plugin twice). Heal a
+  // patch file that is not a valid patch document (e.g. an earlier migration
+  // left only the comment header) back to the empty list, because the dsh
+  // loader refuses to boot a profile whose patch layer does not parse.
   const patchPath = join(profileDir, 'cordis.patch.yml')
   if (existsSync(patchPath)) {
-    const { text, removed } = stripManagedBlock(readFileSync(patchPath, 'utf8'))
-    if (removed) {
-      writeFileSync(patchPath, text)
-      console.log(`dsh-vl-gateway: migrated — removed the legacy managed block from ${patchPath}`)
+    const before = readFileSync(patchPath, 'utf8')
+    const { text, removed } = stripManagedBlock(before)
+    const next = removed || hasPatchContent(text) ? text : ensureArrayDocument(text)
+    if (next !== before) {
+      writeFileSync(patchPath, next)
+      console.log(removed
+        ? `dsh-vl-gateway: migrated — removed the legacy managed block from ${patchPath}`
+        : `dsh-vl-gateway: healed ${patchPath} — restored the empty patch list the dsh loader requires`)
     }
   }
 }

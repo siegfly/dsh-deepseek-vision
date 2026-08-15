@@ -55,11 +55,30 @@ export const PROFILE_PATCH_TEMPLATE = `# Your patch layer for this dsh profile, 
 []
 `
 
+/** True when the text carries patch content — at least one non-comment,
+ * non-blank line — as opposed to only the template header (or nothing). */
+export function hasPatchContent(text) {
+  return text.split('\n').some((line) => {
+    const trimmed = line.trim()
+    return trimmed !== '' && !trimmed.startsWith('#')
+  })
+}
+
+/** Restore the valid empty-list document when the text carries no patch
+ * content. The dsh loader rejects a user patch layer that is not a
+ * top-level YAML array, so a comments-only (or empty) document must end
+ * with `[]`. */
+export function ensureArrayDocument(text) {
+  if (hasPatchContent(text)) return text
+  const trimmed = text.trim()
+  return trimmed.length === 0 ? '[]\n' : `${trimmed}\n[]\n`
+}
+
 /**
  * Strip this plugin's legacy managed block from the profile's user patch
  * layer. A missing end marker consumes through end-of-file (the block was
- * truncated, so the remainder is all ours to drop). An empty remainder
- * becomes the valid empty-list document.
+ * truncated, so the remainder is all ours to drop). An empty or
+ * comments-only remainder becomes the valid empty-list document.
  * @returns the replacement text and whether a block was removed.
  */
 export function stripManagedBlock(text) {
@@ -68,8 +87,8 @@ export function stripManagedBlock(text) {
   const end = text.indexOf(PATCH_END, start)
   const tail = end === -1 ? text.length : end + PATCH_END.length
   const rest = text.slice(0, start) + text.slice(tail)
-  const next = rest.trim().length === 0 ? '[]\n' : `${rest.trim()}\n`
-  return { text: next, removed: true }
+  if (!hasPatchContent(rest)) return { text: ensureArrayDocument(rest), removed: true }
+  return { text: `${rest.trim()}\n`, removed: true }
 }
 
 /**
