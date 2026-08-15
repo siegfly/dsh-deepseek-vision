@@ -9,6 +9,13 @@ records the dsh version the committed `lib/` was built against — provenance, n
 install gate: every install rebuilds the plugin against the target machine's own dsh,
 so releases keep installing on newer (or older) official dsh.
 
+## 0.1.1
+
+- Docs & discoverability: screenshots of the provider picker and the plugin settings
+  card in both READMEs (rendered on the npm page too); npm keywords for search
+  (`deepseek-harness`, `vision-language`, `coding-agent`); GitHub topics and repo
+  description set. No code changes.
+
 ## 0.1.0 (v0.1.0-dsh-rc5)
 
 - Official bundle mechanism: `dsh.bundle.patch` + shipped `cordis.patch.yml`; install

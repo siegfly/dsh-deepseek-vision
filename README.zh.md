@@ -1,7 +1,7 @@
 # dsh-deepseek-vision
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
-[![](https://img.shields.io/badge/release-v0.1.0--dsh--rc5-5B4CF0?style=flat-square)](./CHANGELOG.md)
+[![](https://img.shields.io/badge/release-v0.1.1-5B4CF0?style=flat-square)](./CHANGELOG.md)
 [![](https://img.shields.io/badge/verified-94%20tests-2EA44F?style=flat-square)](./tests)
 [![](https://img.shields.io/badge/license-MIT-0B7285?style=flat-square)](./LICENSE)
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
@@ -58,6 +58,8 @@ dsh plugin --profile headless add dsh-deepseek-vision
 
 聊天窗里选中 **DeepSeek + Vision** provider 之后：
 
+![模型选择器里的 DeepSeek + Vision provider](./docs/images/provider-picker.png)
+
 - **粘贴 / 拖入图片** → 被配置好的视觉模型先描述成文字（逐字提取代码、报错、日志、
   UI 文案，并描述布局）；
 - 描述文字替代图片发给 DeepSeek → 你继续用 DeepSeek 写代码，同时获得图片理解能力；
@@ -105,6 +107,8 @@ credentials seam 解析（Web Models 页写入的凭据即可用），无 seam �
 `llm-vl-gateway` 也是一个 settings namespace，三个编辑入口：**设置 → 插件 → 插件配置**
 的"DeepSeek + Vision（视觉语言桥接）"卡片（`vl.*` 全字段 + VL 密钥）、Web Models 页
 （`deepseek.*` 子段由可配置 provider 目录接管）、`settings.yaml`（两个子段都可写）。
+
+![插件设置卡片](./docs/images/plugin-settings.png)
 
 `provider` / `displayName` 是注册期事实，修改即时生效（adapter 路由 + 可配置 provider
 目录原子重注册，不需重启）；改成已被占用的路由 id 时两个注册表保留旧值并记日志。

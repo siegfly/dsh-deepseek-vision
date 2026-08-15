@@ -1,6 +1,6 @@
 {
   "name": "dsh-deepseek-vision",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Out-of-tree dsh provider plugin: a DeepSeek gateway route that claims image input and transparently describes pasted images through a configured vision-language model (e.g. Qwen-VL) before the text-only DeepSeek wire sees them.",
   "repository": {
     "type": "git",
@@ -61,12 +61,15 @@
   "keywords": [
     "dsh",
     "deepseek",
+    "deepseek-harness",
     "plugin",
     "vision",
+    "vision-language",
     "multimodal",
     "qwen-vl",
     "provider",
-    "llm-gateway"
+    "llm-gateway",
+    "coding-agent"
   ],
   "packageManager": "pnpm@11.7.0",
   "scripts": {

@@ -1,7 +1,7 @@
 # dsh-deepseek-vision
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
-[![](https://img.shields.io/badge/release-v0.1.0--dsh--rc5-5B4CF0?style=flat-square)](./CHANGELOG.md)
+[![](https://img.shields.io/badge/release-v0.1.1-5B4CF0?style=flat-square)](./CHANGELOG.md)
 [![](https://img.shields.io/badge/verified-94%20tests-2EA44F?style=flat-square)](./tests)
 [![](https://img.shields.io/badge/license-MIT-0B7285?style=flat-square)](./LICENSE)
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
@@ -63,6 +63,8 @@ flow, see [Install](#install)). **Restart `dsh web` once** after installing. Uni
 ## What It Does
 
 Select the **DeepSeek + Vision** provider in the chat:
+
+![DeepSeek + Vision provider in the model picker](./docs/images/provider-picker.png)
 
 - **paste / drop an image** → the configured VL model describes it first (verbatim code,
   errors, logs, UI text, plus layout);
@@ -146,6 +148,8 @@ The settings card is this plugin's **client face** (`dsh.client`): it registers 
 `settings.plugin.item` slot the same way official decoupled plugins do, and edits the
 `llm-vl-gateway.vl` section with the same interaction model as built-in cards (drafts,
 override state, save-as-a-whole).
+
+![Plugin settings card](./docs/images/plugin-settings.png)
 
 ## Install
 
