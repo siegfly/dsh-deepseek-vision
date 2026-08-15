@@ -1,0 +1,13 @@
+# The plugin's @deepseek-ai/* peer dependencies are NOT installed here: they
+# resolve at runtime through the dsh profile's healed module fallback (the
+# installation the profile boots with), so every plugin shares the harness's
+# single cordis instance. autoInstallPeers: false keeps a dev-time
+# `pnpm install` from pulling harness packages from the npm registry, whose
+# published versions may lag the local installation.
+packages:
+  - .
+
+nodeLinker: isolated
+autoInstallPeers: false
+allowBuilds:
+  esbuild: true
