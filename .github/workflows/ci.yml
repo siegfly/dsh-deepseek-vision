@@ -1,0 +1,93 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Dev-machine path: build/test against a fresh official source checkout and
+  # run the full client-preset drift check. This is the canary that catches
+  # official preset drift (check-compat exit 3) before a release ships.
+  checkout-mode:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      DSH_CHECKOUT: ${{ runner.temp }}/dsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Clone official dsh checkout (shallow)
+        run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$RUNNER_TEMP/dsh"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+      - name: Compatibility check (0 = match; 1 = advisory; >=2 = refuse)
+        run: |
+          node scripts/check-compat.mjs
+          code=$?
+          if [ "$code" -gt 1 ]; then exit "$code"; fi
+
+  # Foreign-machine path: no source checkout, only the npm-published dsh
+  # (pinned at 0.1.0-rc.6). Builds the fake healed fallback, then exercises
+  # the exact steps a user machine runs: install, build, test, check-compat
+  # (expected exit 1: target rc.6 vs anchor rc.5 = advisory), install-profile.
+  installed-mode:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      DSH_HOME: ${{ runner.temp }}/fake-home
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fake healed fallback from npm (dsh rc.6 tree)
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/fake-home/profiles/web"
+          cd "$RUNNER_TEMP/fake-home/profiles"
+          pnpm init >/dev/null
+          # pnpm exits non-zero with ERR_PNPM_IGNORED_BUILDS on dsh's native
+          # toolchain deps even though the tree installs; assert on the tree
+          # itself instead of the exit code.
+          pnpm add @deepseek-ai/dsh@0.1.0-rc.6 \
+            @deepseek-ai/dsh-llm@0.1.0-rc.6 @deepseek-ai/dsh-llm-deepseek@0.1.0-rc.6 \
+            @deepseek-ai/dsh-settings@0.1.0-rc.6 @deepseek-ai/dsh-attachment@0.1.0-rc.6 \
+            @deepseek-ai/dsh-api-remotes@0.1.0-rc.6 @deepseek-ai/dsh-credentials@0.1.0-rc.6 \
+            @deepseek-ai/dsh-anonymous-user-id@0.1.0-rc.6 @deepseek-ai/dsh-launch-environment@0.1.0-rc.6 \
+            @deepseek-ai/dsh-timeout@0.1.0-rc.6 @deepseek-ai/dsh-brand@0.1.0-rc.6 \
+            @deepseek-ai/dsh-home-paths@0.1.0-rc.6 @deepseek-ai/dsh-invariants@0.1.0-rc.6 \
+            @deepseek-ai/dsh-client-ui-slots@0.1.0-rc.6 @deepseek-ai/dsh-client-ui-settings-plugins@0.1.0-rc.6 \
+            @deepseek-ai/dsh-client-ui-settings@0.1.0-rc.6 @deepseek-ai/dsh-client-locale@0.1.0-rc.6 \
+            @deepseek-ai/dsh-client-connection@0.1.0-rc.6 @deepseek-ai/dsh-client-runtime@0.1.0-rc.6 \
+            @deepseek-ai/cordis@4.0.1 @deepseek-ai/cosmokit@1.8.2 @deepseek-ai/schemastery@3.18.1 \
+            react@18.2.0 || true
+          test -f node_modules/@deepseek-ai/dsh/package.json
+          echo '{"name":"profile-web","private":true}' > "$RUNNER_TEMP/fake-home/profiles/web/package.json"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Tests (client suites self-skip: npm ships the client runtime browser-only)
+        run: pnpm test
+      - name: Compatibility check (target rc.6 vs anchor rc.5 = advisory exit 1)
+        run: |
+          node scripts/check-compat.mjs "$DSH_HOME"
+          code=$?
+          if [ "$code" -gt 1 ]; then exit "$code"; fi
+      - name: Install into the fake profile (the exact user-machine flow)
+        run: node scripts/install-profile.mjs web "$DSH_HOME"

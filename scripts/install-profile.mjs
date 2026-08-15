@@ -87,14 +87,27 @@ if (!existsSync(profileDir)) fail(`profile ${profile} not found at ${profileDir}
 //    $DSH_HOME/profiles/node_modules fallback resolves all @deepseek-ai peers).
 //    Remove first: pnpm keys `file:` packages by spec + version, so a rebuild
 //    with an unchanged version would report "Already up to date" and keep the
-//    stale hardlinked copy — the remove forces the fresh link.
+//    stale hardlinked copy — the remove forces the fresh link. pnpm 11 makes
+//    `remove` of a not-yet-installed dep a hard error, so only remove when a
+//    link actually exists (the project root hoists it into either the profile
+//    dir's node_modules or the parent profiles/ one).
 console.log(`dsh-vl-gateway: installing into ${profileDir}…`)
-spawnSync(cmd, ['remove', 'dsh-vl-gateway'], {
+const linkPaths = [join(profileDir, 'node_modules', 'dsh-vl-gateway'), join(dirname(profileDir), 'node_modules', 'dsh-vl-gateway')]
+if (linkPaths.some(p => existsSync(p))) runPnpm(['remove', 'dsh-vl-gateway'])
+const added = spawnSync(cmd, ['add', `file:${repo}`], {
   cwd: profileDir,
   stdio: 'inherit',
   shell: process.platform === 'win32',
-}) // a not-yet-installed dep is a no-op; failures surface through the add below
-runPnpm(['add', `file:${repo}`])
+})
+if (added.status !== 0) {
+  // pnpm 11 exits non-zero with ERR_PNPM_IGNORED_BUILDS when the profile tree
+  // contains unapproved native build scripts (dsh toolchain deps) even though
+  // the add itself links — the link on disk is the truth.
+  if (!linkPaths.some(p => existsSync(p))) {
+    fail(`pnpm add file:${repo} failed in ${profileDir} and no plugin link exists`)
+  }
+  console.log('dsh-vl-gateway: pnpm exited non-zero (ignored build scripts in the profile tree); the plugin link exists — continuing')
+}
 
 // 5. Ensure the loader row exists in the profile's patch layer. The row makes
 //    the running dsh web hot-reload the plugin (config-only HMR on the profile
