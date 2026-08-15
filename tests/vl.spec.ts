@@ -5,7 +5,6 @@
 
 import { createServer, type Server } from 'node:http'
 import { afterEach, describe, expect, it } from 'vitest'
-import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { describeImage } from '../src/vl.js'
 import type { VlConnectionFacts } from '../src/vl.js'

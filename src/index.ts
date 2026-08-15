@@ -20,7 +20,6 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import {
-  DeepSeekAdapter,
   resolveAdapterOptions,
   Config as DeepSeekSectionSchema,
 } from '@deepseek-ai/dsh-llm-deepseek'
