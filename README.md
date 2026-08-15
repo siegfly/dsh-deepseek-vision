@@ -47,7 +47,7 @@ Prerequisites: dsh installed and booted at least once, `pnpm` on PATH, Node 22.1
 dsh plugin --profile web add dsh-deepseek-vision                          # npm
 dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git, pinned commit
 dsh plugin --profile web add file:<repo path>                        # local directory (dev)
-dsh plugin --profile web add ./dsh-deepseek-vision-0.1.0.tgz              # tarball
+dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
 
 # Verify the bundle layer is mounted
 dsh --profile web --dump-config | grep llm-vl-gateway

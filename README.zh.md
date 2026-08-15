@@ -41,7 +41,7 @@
 dsh plugin --profile web add dsh-deepseek-vision                          # npm
 dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git，锁 commit
 dsh plugin --profile web add file:<本仓库路径>                        # 本地目录（开发）
-dsh plugin --profile web add ./dsh-deepseek-vision-0.1.0.tgz              # tarball
+dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
 
 # 验证 bundle 层已挂载
 dsh --profile web --dump-config | grep llm-vl-gateway
