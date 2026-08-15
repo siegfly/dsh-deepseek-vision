@@ -43,8 +43,8 @@ jobs:
       - run: pnpm test
       - name: Compatibility check (refuse on stamp/preset integrity failures)
         run: |
-          node scripts/check-compat.mjs
-          code=$?
+          code=0
+          node scripts/check-compat.mjs || code=$?
           if [ "$code" -gt 1 ]; then exit "$code"; fi
       - name: Publish to npm (provenance)
         run: npm publish --provenance --access public

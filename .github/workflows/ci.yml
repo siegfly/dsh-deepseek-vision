@@ -39,8 +39,8 @@ jobs:
       - run: pnpm test
       - name: Compatibility check (0 = match; 1 = advisory; >=2 = refuse)
         run: |
-          node scripts/check-compat.mjs
-          code=$?
+          code=0
+          node scripts/check-compat.mjs || code=$?
           if [ "$code" -gt 1 ]; then exit "$code"; fi
 
   # Foreign-machine path: no source checkout, only the npm-published dsh
@@ -104,8 +104,8 @@ jobs:
         run: pnpm test
       - name: Compatibility check (target rc.6 vs anchor rc.5 = advisory exit 1)
         run: |
-          node scripts/check-compat.mjs "$DSH_HOME"
-          code=$?
+          code=0
+          node scripts/check-compat.mjs "$DSH_HOME" || code=$?
           if [ "$code" -gt 1 ]; then exit "$code"; fi
       - name: Install into the fake profile (the exact user-machine flow)
         run: node scripts/install-profile.mjs web "$DSH_HOME"
