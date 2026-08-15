@@ -63,8 +63,15 @@ Node 22.19+ 或 24+（与官方 dsh 相同）；首次 `pnpm install` 需联网�
 设计跳过，见"开发"）/ `check-compat` exit 1 提示放行 / 安装成功（见"版本对齐"）。
 
 ```powershell
-# 方式 A（推荐，官方 CLI 在 PATH 时）：与官方插件安装完全相同的路径
-dsh plugin --profile web add file:<本仓库路径>     # 未来发布 npm 后：dsh plugin add dsh-vl-gateway
+# 方式 A（推荐，官方 CLI 在 PATH 时）：与官方插件安装完全相同的路径，
+# spec 支持官方文档列出的全部形式（npm 包名 / git spec / 本地目录 / 本地 tarball）
+dsh plugin --profile web add dsh-vl-gateway                              # npm（发布后）
+dsh plugin --profile web add github:<you>/dsh-vl-gateway#<commit-sha>    # git，锁 commit
+dsh plugin --profile web add file:<本仓库路径>                           # 本地目录（开发）
+dsh plugin --profile web add ./dsh-vl-gateway-0.1.0.tgz                  # tarball（无 git/网络）
+
+# headless profile 同样支持（dsh run 默认用 headless；client 卡片只在 web 生效）
+dsh plugin --profile headless add dsh-vl-gateway
 
 # 方式 B（无 CLI 时）：本仓库脚本等价复刻方式 A（init 布局 → pnpm add → bundles 对账）
 pnpm install        # 只装 devDeps（typescript/vitest），不会装 @deepseek-ai/*
