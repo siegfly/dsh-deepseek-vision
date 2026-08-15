@@ -195,6 +195,41 @@ export function officialPresetValues(checkoutRoot) {
 }
 
 /**
+ * Read the committed build-anchor stamp (`lib/build-anchor.json`) — the
+ * mechanical record of which dsh version the committed lib/ was built
+ * against, written by `pnpm build` through harness-paths.mjs --write-anchor.
+ * @param stampPath - override for tests.
+ * @returns the stamp `{version, kind}`, or undefined when the committed lib
+ *   predates the stamp (build once to write it).
+ */
+export function buildAnchorStamp(stampPath = join(repo, 'lib', 'build-anchor.json')) {
+  if (!existsSync(stampPath)) return undefined
+  try {
+    const parsed = JSON.parse(readFileSync(stampPath, 'utf8'))
+    const version = typeof parsed.version === 'string' && parsed.version.length > 0 ? parsed.version : undefined
+    const kind = parsed.kind === 'checkout' || parsed.kind === 'installed' ? parsed.kind : undefined
+    if (version === undefined || kind === undefined) return undefined
+    return { version, kind }
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Grade the committed build stamp against the declared anchor. This is the
+ * honesty check: `dshCompat.anchorVersion` is hand-written metadata, and only
+ * the stamp proves the committed lib/ was really built against that version.
+ * @returns verdict `ok`, `missing` (lib predates the stamp), `lie` (the
+ *   stamp and the declared anchor disagree — the tag would mislead), or
+ *   `unreadable`.
+ */
+export function gradeBuildAnchor(stamp, anchor) {
+  if (stamp === undefined) return 'missing'
+  if (stamp.version === anchor) return 'ok'
+  return 'lie'
+}
+
+/**
  * Diff the frozen client-preset replica against an official source checkout.
  * @returns per-item rows; verdict `ok`, `drift`, or `unreadable` (an extraction
  *   failed — a false alarm would be worse than silence, so it is a note, not
@@ -243,7 +278,25 @@ function main() {
     console.log(`  ${mark} ${row.label.padEnd(28)} ${row.actual ?? '(not found)'}`)
     if (row.verdict === 'missing') missing = true
   }
+
+  // Build-anchor honesty check: the committed stamp must equal the declared
+  // anchor, or the tag/message this release ships under would mislead.
+  const stamp = buildAnchorStamp()
+  const stampVerdict = gradeBuildAnchor(stamp, anchor)
+  {
+    const label = 'build anchor stamp (lib/)'
+    const mark = stampVerdict === 'ok' ? 'OK ' : stampVerdict === 'lie' ? 'XX ' : '?? '
+    console.log(`  ${mark} ${label.padEnd(28)} ${stamp === undefined ? '(missing — run `pnpm build` once)' : `${stamp.version} (${stamp.kind})`}`)
+  }
   console.log('')
+
+  if (stampVerdict === 'lie') {
+    console.log(`The committed lib/ was built against dsh ${stamp.version} but dshCompat.anchorVersion declares ${anchor}. Update the anchor and re-tag, or rebuild against the declared version — do not ship this combination.`)
+    process.exit(2)
+  }
+  if (stampVerdict === 'missing') {
+    console.log('The committed lib/ carries no build-anchor stamp yet. Run `pnpm build` once; the stamp is the mechanical proof the anchor matches the actual build.')
+  }
 
   if (missing) {
     console.log('The healed fallback has no entry for one or more packages. Boot `dsh web` once on this machine (the launcher maintains that directory), then re-run this check.')

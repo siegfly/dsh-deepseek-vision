@@ -8,8 +8,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  assess, baseOf, compare, installedVersion, officialExternals, presetDrift,
-  replicaValues, SPOT_CHECKS,
+  assess, baseOf, buildAnchorStamp, compare, gradeBuildAnchor, installedVersion,
+  officialExternals, presetDrift, replicaValues, SPOT_CHECKS,
 } from '../scripts/check-compat.mjs'
 
 /** Write one fixture package manifest into a fake fallback directory. */
@@ -71,6 +71,35 @@ describe('fallback assessment', () => {
     const result = assess(dir)
     expect(result.exitCode).toBe(2)
     expect(result.rows.every(row => row.verdict === 'mismatch')).toBe(true)
+  })
+})
+
+describe('build anchor stamp', () => {
+  let dir: string
+
+  afterEach(() => {
+    if (dir !== undefined) rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('reads the committed stamp file', () => {
+    dir = mkdtempSync(join(tmpdir(), 'dsh-stamp-'))
+    const stampPath = join(dir, 'stamp.json')
+    writeFileSync(stampPath, JSON.stringify({ version: '0.1.0-rc.5', kind: 'checkout' }))
+    expect(buildAnchorStamp(stampPath)).toEqual({ version: '0.1.0-rc.5', kind: 'checkout' })
+    expect(buildAnchorStamp(join(dir, 'absent.json'))).toBeUndefined()
+  })
+
+  it('grades the stamp against the declared anchor: ok, lie, missing', () => {
+    expect(gradeBuildAnchor({ version: '0.1.0-rc.5', kind: 'checkout' }, '0.1.0-rc.5')).toBe('ok')
+    expect(gradeBuildAnchor({ version: '0.1.0-rc.6', kind: 'checkout' }, '0.1.0-rc.5')).toBe('lie')
+    expect(gradeBuildAnchor(undefined, '0.1.0-rc.5')).toBe('missing')
+  })
+
+  it('treats an unreadable stamp as missing rather than failing', () => {
+    dir = mkdtempSync(join(tmpdir(), 'dsh-stamp-'))
+    const stampPath = join(dir, 'stamp.json')
+    writeFileSync(stampPath, '{not json')
+    expect(buildAnchorStamp(stampPath)).toBeUndefined()
   })
 })
 

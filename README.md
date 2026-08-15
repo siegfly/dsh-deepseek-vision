@@ -160,7 +160,12 @@ pnpm build     # harness-paths --write（生成 tsconfig.paths.json，gitignored
 
 - `package.json` 的 `dshCompat.anchorVersion` 声明本发布版 `lib/` 的**构建锚点**
   （当前 `0.1.0-rc.5`，即本机 checkout 的 `apps/cli` 版本）；
-- 每次发版打 tag：`v<插件版本>-dsh-rc<N>`，例如 `v0.1.0-dsh-rc5` —— tag 直接标出锚点；
+- **构建戳让锚点无法撒谎**：`pnpm build` 末尾把实际解析到的 harness dsh 版本盖进提交的
+  `lib/build-anchor.json`；check-compat 校验"构建戳 = `anchorVersion`"，不一致直接
+  exit 2——拿新 checkout 重建了却忘记改锚点时，tag 会在发布前被拦下，而不是让
+  `v0.1.0-dsh-rc5` 装着按 rc.6 构建的产物；
+- 每次发版打 tag：`v<插件版本>-dsh-rc<N>`，例如 `v0.1.0-dsh-rc5` —— tag 直接标出锚点
+  （tag 本身不会跟随官方更新，它只是冻结的历史标签；"跟随"= 重建 + 改锚点 + 打新 tag）；
 - **兼容性检查**（安装时自动运行，也可单独跑）：
   ```powershell
   node scripts/check-compat.mjs [dshHome]
@@ -169,6 +174,10 @@ pnpm build     # harness-paths --write（生成 tsconfig.paths.json，gitignored
   `dsh-client-ui-settings-plugins` 的实际版本并对照锚点分级：完全一致=exit 0；同版本线
   不同 rc（如 rc.5→rc.6）=exit 1（大概率兼容，建议贴图冒烟一次）；版本线不同=exit 2
   （必须重建）。fallback 目录不存在（dsh web 还没启动过）时给出提示。
+
+  `install-profile` 以这次检查为准绳：exit 2/3 会**拒绝安装**（已知不匹配的构建不会
+  替换掉在用的好构建；`DSH_VL_GATEWAY_FORCE=1` 可强制），exit 1 放行并保留上面的冒烟
+  提示。
 
   此外，当本机有官方源码 checkout（`$DSH_CHECKOUT` 或 `harness-paths.json`）时，检查还会
   把本仓库 `tsdown.config.ts` 里**冻结复刻**的客户端 bundle 预设（模块表外部依赖清单、

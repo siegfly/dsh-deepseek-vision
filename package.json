@@ -36,7 +36,7 @@
     "lib"
   ],
   "scripts": {
-    "build": "node scripts/harness-paths.mjs --write && tsc -p tsconfig.json && tsdown",
+    "build": "node scripts/harness-paths.mjs --write && tsc -p tsconfig.json && tsdown && node scripts/harness-paths.mjs --write-anchor",
     "test": "vitest run",
     "install-profile": "node scripts/install-profile.mjs",
     "uninstall-profile": "node scripts/uninstall-profile.mjs"

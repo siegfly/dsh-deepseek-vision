@@ -13,8 +13,10 @@
  *      `lib/types/*.d.ts` (works on `npx @deepseek-ai/dsh web` machines too).
  *
  * `node scripts/harness-paths.mjs --write` regenerates tsconfig.paths.json
- * (gitignored) that tsconfig.json extends; vitest.config.ts imports this
- * module directly and resolves aliases through resolvePackageDir().
+ * (gitignored) that tsconfig.json extends; `--write-anchor` stamps the
+ * resolved dsh version into the committed lib/build-anchor.json (the
+ * mechanical proof of what lib/ was built against). vitest.config.ts imports
+ * this module directly and resolves aliases through resolvePackageDir().
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -181,6 +183,55 @@ export function writeTsconfigPaths() {
   return { target, entries: Object.keys(paths).length, missing }
 }
 
+/**
+ * The dsh version the harness source actually carries. This is the BUILD
+ * ANCHOR in the strict sense: the version the committed lib/ was compiled
+ * against, read from the same resolution seam the build itself used — the
+ * checkout's `apps/cli` manifest for a source checkout, the installed
+ * launcher manifest for the healed fallback.
+ * @param located - a resolved harness source ({root, kind}).
+ * @returns `{ version, kind }`, or undefined when the source carries no
+ *   readable dsh version.
+ */
+export function harnessVersion(located) {
+  const manifestPath = located.kind === 'checkout'
+    ? join(located.root, 'apps', 'cli', 'package.json')
+    : join(located.root, '@deepseek-ai', 'dsh', 'package.json')
+  if (!existsSync(manifestPath)) return undefined
+  try {
+    const version = JSON.parse(readFileSync(manifestPath, 'utf8')).version
+    return typeof version === 'string' && version.length > 0
+      ? { version, kind: located.kind }
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Stamp the resolved harness version into the committed `lib/build-anchor.json`.
+ * The stamp is the one mechanical proof of what the committed lib/ was REALLY
+ * built against: check-compat.mjs compares it with the hand-declared
+ * `dshCompat.anchorVersion`, so a rebuild against a newer checkout without an
+ * anchor update is caught instead of shipping a tag that lies.
+ * @returns the stamp ({version, kind, path}), or undefined when unresolvable.
+ */
+export function writeBuildAnchor() {
+  const located = harnessRoot()
+  if (located === undefined) {
+    printGuidance()
+    process.exit(1)
+  }
+  const facts = harnessVersion(located)
+  if (facts === undefined) {
+    console.log(`dsh-vl-gateway: WARNING — no dsh version readable from ${located.root}; lib/build-anchor.json not written`)
+    return undefined
+  }
+  const target = join(repoRoot, 'lib', 'build-anchor.json')
+  writeFileSync(target, JSON.stringify(facts, undefined, 2) + '\n')
+  return { ...facts, path: target }
+}
+
 function printGuidance() {
   console.log('dsh-vl-gateway: no harness types found. Provide ONE of:')
   console.log('  1. $DSH_CHECKOUT pointing at a dsh source checkout;')
@@ -200,6 +251,13 @@ function main() {
     if (missing > 0) {
       console.log(`dsh-vl-gateway: WARNING — ${missing} package type entries could not be resolved; the build will fail on their imports.`)
       process.exit(1)
+    }
+    return
+  }
+  if (process.argv.includes('--write-anchor')) {
+    const stamp = writeBuildAnchor()
+    if (stamp !== undefined) {
+      console.log(`dsh-vl-gateway: build anchor stamped: ${stamp.version} (${stamp.kind}) → ${stamp.path}`)
     }
     return
   }

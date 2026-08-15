@@ -4,7 +4,10 @@
  *
  * The profile lives at $DSH_HOME/profiles/<profile> (default: web). This
  * script is equivalent to `dsh plugin --profile <profile> add file:<repo>`
- * plus the patch-row edit, without requiring the dsh CLI on PATH.
+ * plus the patch-row edit, without requiring the dsh CLI on PATH. The install
+ * is GATED on scripts/check-compat.mjs first: a version mismatch or a drifted
+ * client-preset replica aborts before the profile is touched
+ * (DSH_VL_GATEWAY_FORCE=1 overrides).
  *
  * Usage:
  *   node scripts/install-profile.mjs [profile] [dshHome]
@@ -50,10 +53,28 @@ execFileSync(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', ['build'], {
   shell: process.platform === 'win32',
 })
 
-// 2. Profile must exist (a default dsh web install has it; create the layout otherwise).
+// 2. Compatibility gate BEFORE anything touches the profile: a version
+//    mismatch (exit 2) or a drifted client-preset replica (exit 3) aborts the
+//    install, so a known-bad build never replaces a working one. An adjacent
+//    prerelease (exit 1) proceeds with the smoke-test warning the checker
+//    printed. DSH_VL_GATEWAY_FORCE=1 overrides both refusals.
+console.log('')
+const check = spawnSync(process.execPath, [join(repo, 'scripts', 'check-compat.mjs'), dshHome], {
+  stdio: 'inherit',
+})
+const checkCode = check.status ?? 1
+if (checkCode === 2 || checkCode === 3) {
+  if (process.env.DSH_VL_GATEWAY_FORCE !== '1') {
+    fail('compatibility check failed — fix per README "版本对齐" or set DSH_VL_GATEWAY_FORCE=1 to install anyway')
+  }
+  console.log('dsh-vl-gateway: forced install despite the compatibility failure')
+}
+console.log('')
+
+// 3. Profile must exist (a default dsh web install has it; create the layout otherwise).
 if (!existsSync(profileDir)) fail(`profile ${profile} not found at ${profileDir}; boot 'dsh web' once first`)
 
-// 3. Install the plugin into the profile (pnpm hoisted linker; the healed
+// 4. Install the plugin into the profile (pnpm hoisted linker; the healed
 //    $DSH_HOME/profiles/node_modules fallback resolves all @deepseek-ai peers).
 //    Remove first: pnpm keys `file:` packages by spec + version, so a rebuild
 //    with an unchanged version would report "Already up to date" and keep the
@@ -66,7 +87,7 @@ spawnSync(cmd, ['remove', 'dsh-vl-gateway'], {
 }) // a not-yet-installed dep is a no-op; failures surface through the add below
 runPnpm(['add', `file:${repo}`])
 
-// 4. Ensure the loader row exists in the profile's patch layer. The row makes
+// 5. Ensure the loader row exists in the profile's patch layer. The row makes
 //    the running dsh web hot-reload the plugin (config-only HMR on the profile
 //    patch), so no restart is needed.
 const patchPath = join(profileDir, 'cordis.patch.yml')
@@ -81,15 +102,6 @@ if (before.includes('llm-vl-gateway')) {
   writeFileSync(patchPath, next)
   console.log(`dsh-vl-gateway: appended loader row to ${patchPath}`)
 }
-
-// 5. Compatibility check against the target machine's installed dsh (the
-//    healed fallback the launcher maintains). Informational only: installs
-//    proceed regardless, but a mismatch names the rebuild path.
-console.log('')
-const check = spawnSync(process.execPath, [join(repo, 'scripts', 'check-compat.mjs'), dshHome], {
-  stdio: 'inherit',
-})
-void check
 
 console.log(`
 Done. Next steps:

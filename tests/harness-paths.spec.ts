@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
-  buildTsconfigPaths, harnessRootWith, resolvePackageDir,
+  buildTsconfigPaths, harnessRootWith, harnessVersion, resolvePackageDir,
 } from '../scripts/harness-paths.mjs'
 
 /** Write one fake package manifest (checkout layout: packages/<domain>/<pkg>). */
@@ -88,5 +88,33 @@ describe('harness-paths seam', () => {
     expect(paths['@deepseek-ai/dsh-llm']).toEqual([
       join(root, 'packages', 'llm', 'llm', 'lib', 'types', 'index.d.ts'),
     ])
+  })
+
+  it('reads the dsh version from a checkout (apps/cli) and from the installed fallback', () => {
+    const checkout = mkdtempSync(join(tmpdir(), 'dsh-checkout-'))
+    dirs.push(checkout)
+    mkdirSync(join(checkout, 'apps', 'cli'), { recursive: true })
+    writeFileSync(
+      join(checkout, 'apps', 'cli', 'package.json'),
+      JSON.stringify({ name: '@deepseek-ai/dsh', version: '0.1.0-rc.5' }),
+    )
+    expect(harnessVersion({ root: checkout, kind: 'checkout' }))
+      .toEqual({ version: '0.1.0-rc.5', kind: 'checkout' })
+
+    const fallback = mkdtempSync(join(tmpdir(), 'dsh-fallback-'))
+    dirs.push(fallback)
+    mkdirSync(join(fallback, '@deepseek-ai', 'dsh'), { recursive: true })
+    writeFileSync(
+      join(fallback, '@deepseek-ai', 'dsh', 'package.json'),
+      JSON.stringify({ name: '@deepseek-ai/dsh', version: '0.1.0-rc.6' }),
+    )
+    expect(harnessVersion({ root: fallback, kind: 'installed' }))
+      .toEqual({ version: '0.1.0-rc.6', kind: 'installed' })
+  })
+
+  it('reports no version when the harness source carries none', () => {
+    const empty = mkdtempSync(join(tmpdir(), 'dsh-empty-'))
+    dirs.push(empty)
+    expect(harnessVersion({ root: empty, kind: 'checkout' })).toBeUndefined()
   })
 })
