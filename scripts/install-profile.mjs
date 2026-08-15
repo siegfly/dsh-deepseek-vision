@@ -73,6 +73,15 @@ if (before.includes('llm-vl-gateway')) {
   console.log(`dsh-vl-gateway: appended loader row to ${patchPath}`)
 }
 
+// 5. Compatibility check against the target machine's installed dsh (the
+//    healed fallback the launcher maintains). Informational only: installs
+//    proceed regardless, but a mismatch names the rebuild path.
+console.log('')
+const check = spawnSync(process.execPath, [join(repo, 'scripts', 'check-compat.mjs'), dshHome], {
+  stdio: 'inherit',
+})
+void check
+
 console.log(`
 Done. Next steps:
 1. FIRST install on a machine: restart \`dsh web\` so the client module scan

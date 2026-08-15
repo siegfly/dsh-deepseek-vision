@@ -28,6 +28,10 @@
       "platform": "web"
     }
   },
+  "dshCompat": {
+    "anchorVersion": "0.1.0-rc.5",
+    "note": "The dsh version this release's committed lib/ was built against. scripts/check-compat.mjs compares the target machine's installed dsh against it; rebuild (pnpm build) when the target differs."
+  },
   "files": [
     "lib"
   ],
