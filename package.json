@@ -1,6 +1,6 @@
 {
   "name": "dsh-deepseek-vision",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Out-of-tree dsh provider plugin: a DeepSeek gateway route that claims image input and transparently describes pasted images through a configured vision-language model (e.g. Qwen-VL) before the text-only DeepSeek wire sees them.",
   "repository": {
     "type": "git",
@@ -41,7 +41,7 @@
     }
   },
   "dshCompat": {
-    "anchorVersion": "0.1.0-rc.5",
+    "anchorVersion": "0.1.0-rc.6",
     "note": "Provenance of the committed lib/ only, NOT an install gate: install-profile rebuilds on the target machine against its own installed dsh, so installs on newer/older official versions proceed with an advisory warning. Only an unbuilt release (missing stamp) or a drifted client preset blocks installation."
   },
   "files": [
@@ -50,7 +50,9 @@
     "CHANGELOG.md",
     "README.md",
     "README.en.md",
-    "docs"
+    "docs/DEVELOPMENT.md",
+    "docs/VERSIONING.md",
+    "docs/images"
   ],
   "publishConfig": {
     "access": "public"

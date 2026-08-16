@@ -65,6 +65,9 @@ rebuild against their own dsh automatically.
 
 ## Tagging
 
-Tag each release `v<plugin-version>-dsh-rc<N>` (e.g. `v0.1.0-dsh-rc5`). The tag is a
-frozen historical label that never needs to follow official updates. Pushing the tag
-triggers the release workflow (npm publish with provenance + GitHub Release).
+Tag each release plain `v<version>` (e.g. `v0.1.4`). The dsh version a release was
+built against already lives inside the package (`dshCompat.anchorVersion` +
+`lib/build-anchor.json`), so the tag carries no dsh suffix — it is a frozen
+historical label that never needs to follow official updates. Pushing the tag
+triggers the release workflow (npm publish with provenance + GitHub Release); do
+not publish manually from a local machine.

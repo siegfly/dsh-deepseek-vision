@@ -9,3 +9,6 @@ node_modules/
 # Machine-local harness type resolution (see scripts/harness-paths.mjs):
 harness-paths.json
 tsconfig.paths.json
+
+# Machine-local ops notes — never shipped or committed:
+docs/OPS.md

@@ -9,6 +9,25 @@ records the dsh version the committed `lib/` was built against — provenance, n
 install gate: every install rebuilds the plugin against the target machine's own dsh,
 so releases keep installing on newer (or older) official dsh.
 
+## 0.1.4
+
+- Credential fallback chain: both legs now fall through to the launching
+  environment when the credentials service is mounted but has no entry for the
+  referenced key (previously the environment was consulted only when no
+  credentials service existed at all). Headless profiles and CI launches can now
+  serve both routes from ambient keys; GUI-written credentials keep precedence.
+- Tests: one new credentials-seam case covers the mounted-but-missing fallback
+  (102 tests collected: 90 passing + 12 designed skips).
+- Release hygiene: CHANGELOG gains the missing 0.1.3 entry; README badges follow
+  the new test count and version; the `files` list ships only the docs that
+  exist.
+
+## 0.1.3
+
+- README beautification and the coverage badge (97% lines, six new edge-path
+  tests). No behavior changes. (Entry restored retroactively in 0.1.4 — the
+  0.1.3 release shipped without one.)
+
 ## 0.1.2
 
 - Docs-only refresh: the npm page now renders the Chinese-default README with the
