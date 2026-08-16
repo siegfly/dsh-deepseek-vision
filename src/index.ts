@@ -201,11 +201,12 @@ export function apply(ctx: Context, config: Config): void {
     if (credentials !== undefined) {
       const hit = await credentials.resolve(ref)
       if (hit !== undefined) return assertUsableApiKey(hit.value, 'llm-vl-gateway', ref)
-    } else {
-      const ambient = launchEnvironmentOf(ctx).get(ref)
-      if (ambient !== undefined && ambient.value.length > 0) {
-        return assertUsableApiKey(ambient.value, 'llm-vl-gateway', ref)
-      }
+    }
+    // Chain fallback: a mounted credentials service that has no entry for this ref still lets an
+    // ambient launching-environment value serve the route (headless profiles, CI launches).
+    const ambient = launchEnvironmentOf(ctx).get(ref)
+    if (ambient !== undefined && ambient.value.length > 0) {
+      return assertUsableApiKey(ambient.value, 'llm-vl-gateway', ref)
     }
     throw new LlmError(
       `llm-vl-gateway: no API key for provider route "${currentProvider()}"; store ${ref} through the`
@@ -220,11 +221,12 @@ export function apply(ctx: Context, config: Config): void {
     if (credentials !== undefined) {
       const hit = await credentials.resolve(credential)
       if (hit !== undefined) return assertUsableApiKey(hit.value, 'llm-vl-gateway', credential)
-    } else {
-      const ambient = launchEnvironmentOf(ctx).get(credential)
-      if (ambient !== undefined && ambient.value.length > 0) {
-        return assertUsableApiKey(ambient.value, 'llm-vl-gateway', credential)
-      }
+    }
+    // Chain fallback: a mounted credentials service that has no entry for this ref still lets an
+    // ambient launching-environment value serve the vision leg.
+    const ambient = launchEnvironmentOf(ctx).get(credential)
+    if (ambient !== undefined && ambient.value.length > 0) {
+      return assertUsableApiKey(ambient.value, 'llm-vl-gateway', credential)
     }
     throw new LlmError(
       `llm-vl-gateway: no API key for the vision model; store ${ref} through the credentials`

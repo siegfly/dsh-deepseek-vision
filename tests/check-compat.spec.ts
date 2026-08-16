@@ -3,7 +3,7 @@
  * the fallback assessment, including the missing-fallback diagnosis.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -11,6 +11,11 @@ import {
   assess, baseOf, buildAnchorStamp, compare, extractRegexSource, gradeBuildAnchor,
   installedVersion, officialExternals, presetDrift, replicaValues, SPOT_CHECKS,
 } from '../scripts/check-compat.mjs'
+
+/** The declared anchor, so fallback-assessment fixtures track releases instead of hardcoding an rc. */
+const ANCHOR = (JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { dshCompat: { anchorVersion: string } }).dshCompat.anchorVersion
+/** One rc ahead of the anchor (its pre-release number + 1). */
+const AHEAD = ANCHOR.replace(/-rc\.(\d+)$/, (_, n: string) => `-rc.${Number(n) + 1}`)
 
 /** Write one fixture package manifest into a fake fallback directory. */
 function writeFixture(root: string, pkg: string, version: string): void {
@@ -59,7 +64,7 @@ describe('fallback assessment', () => {
 
   it('grades a machine one rc ahead as adjacent (exit 1)', () => {
     dir = mkdtempSync(join(tmpdir(), 'dsh-check-'))
-    for (const { pkg } of SPOT_CHECKS) writeFixture(dir, pkg, '0.1.0-rc.6')
+    for (const { pkg } of SPOT_CHECKS) writeFixture(dir, pkg, AHEAD)
     const result = assess(dir)
     expect(result.exitCode).toBe(1)
     expect(result.rows.every(row => row.verdict === 'adjacent')).toBe(true)
@@ -75,7 +80,7 @@ describe('fallback assessment', () => {
 
   it('grades a machine exactly on the anchor as a clean match (exit 0)', () => {
     dir = mkdtempSync(join(tmpdir(), 'dsh-check-'))
-    for (const { pkg } of SPOT_CHECKS) writeFixture(dir, pkg, '0.1.0-rc.5')
+    for (const { pkg } of SPOT_CHECKS) writeFixture(dir, pkg, ANCHOR)
     const result = assess(dir)
     expect(result.exitCode).toBe(0)
     expect(result.rows.every(row => row.verdict === 'match')).toBe(true)

@@ -145,6 +145,41 @@ describe('credentials seam', () => {
     )
   })
 
+  it('falls back to the launch environment when the seam is mounted but lacks the entry', async () => {
+    process.env.QWEN_VL_API_KEY = 'sk-vl-env-fallback'
+    try {
+      await withServer(
+        { status: 500, payload: { error: { message: 'capture only' } } },
+        async (deepseek, deepseekPort) => {
+          await withServer(
+            { status: 200, payload: { choices: [{ message: { content: 'described via env fallback' } }] } },
+            async (vl, vlPort) => {
+              const home = mkdtempSync(join(tmpdir(), 'dsh-creds-'))
+              try {
+                const harness = await makeHarness(deepseekPort, vlPort, { path: join(home, '.credentials.yaml') })
+                try {
+                  await harness.ctx.credentials.set(credentialRef('DEEPSEEK_API_KEY'), 'sk-ds-seam')
+                  // QWEN_VL_API_KEY is deliberately absent from the seam: the chain must
+                  // fall through to the launch environment for the vision leg.
+                  await drain(harness.ctx.llm.stream(imageRequest()))
+                  expect(vl.authorization).toBe('Bearer sk-vl-env-fallback')
+                  expect(deepseek.authorization).toBe('Bearer sk-ds-seam')
+                  expect(vl.calls).toBe(1)
+                } finally {
+                  await harness.dispose()
+                }
+              } finally {
+                rmSync(home, { recursive: true, force: true })
+              }
+            },
+          )
+        },
+      )
+    } finally {
+      delete process.env.QWEN_VL_API_KEY
+    }
+  })
+
   it('fails with MISSING_CREDENTIAL when no seam and no environment carry a VL key', async () => {
     await withServer(
       { status: 500, payload: { error: { message: 'capture only' } } },
