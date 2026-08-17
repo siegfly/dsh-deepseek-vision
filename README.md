@@ -50,12 +50,26 @@
 
 ## 快速开始
 
-前置：dsh 已安装并启动过一次、PATH 里有 `pnpm`（`dsh plugin` 命令经 pnpm 安装插件）。
+前置：`dsh` CLI 已可用并启动过一次、PATH 里有 `pnpm`（`dsh plugin` 命令经 pnpm 安装插件）。
 
-**安装**（npm 发布版，推荐方式）：
+**第一步：新机器装 `dsh`（一次性，二选一）。** `dsh` 是官方 CLI（npm 包
+`@deepseek-ai/dsh`）：
+
+```sh
+npm install -g @deepseek-ai/dsh        # 推荐：dsh 永久进入 PATH，之后命令直接敲
+# 或（官方一行启动方式）：
+npx @deepseek-ai/dsh web               # 不装全局：CLI 只在 npx 缓存里运行，不会进 PATH
+```
+
+> ⚠️ 用 `npx` 方式时 `dsh` **不会**进入 PATH——新开终端直接敲 `dsh` 会报
+> "command not found"。要么全局安装，要么所有命令都带 `npx @deepseek-ai/dsh` 前缀。
+
+**第二步：安装**（npm 发布版，推荐方式）：
 
 ```sh
 dsh plugin --profile web add dsh-deepseek-vision
+# 没装全局、走 npx 时：
+npx @deepseek-ai/dsh plugin --profile web add dsh-deepseek-vision
 ```
 
 **部署使用：** 重启一次 `dsh web` → Models 页选 **DeepSeek + Vision** → 设置 → 插件 →
@@ -243,6 +257,12 @@ pnpm build     # tsc（宿主面 + 客户端面）+ tsdown 浏览器 bundle
 - 描述文本会占用 DeepSeek 的 context（每图几百 token，仅首次计费）。
 
 ## FAQ
+
+**新机器上 `dsh` 命令不存在 / 报 command not found？** 先装官方 CLI：
+`npm install -g @deepseek-ai/dsh`（一次性，之后 `dsh` 永久在 PATH）。如果平时用
+`npx @deepseek-ai/dsh web` 启动（官方一行方式），CLI 只在 npx 缓存里运行、**不会进
+PATH**，装插件时要用 npx 前缀：`npx @deepseek-ai/dsh plugin --profile web add
+dsh-deepseek-vision`——插件本身装在 profile 里，与 CLI 从哪来无关，装一次永久有效。
 
 **安装需要关心 Node 版本吗？** 官方 CLI 路径（`dsh plugin add`）不需要；只有无 CLI 的
 复刻脚本需要 Node 22.19+ / 24+ 和 PATH 里的 `pnpm`。

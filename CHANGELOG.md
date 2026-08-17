@@ -9,6 +9,14 @@ records the dsh version the committed `lib/` was built against — provenance, n
 install gate: every install rebuilds the plugin against the target machine's own dsh,
 so releases keep installing on newer (or older) official dsh.
 
+## 0.1.5
+
+- Docs: READMEs now explain how to install the `dsh` CLI itself on a new machine
+  (global `npm install -g @deepseek-ai/dsh` vs. the `npx @deepseek-ai/dsh web`
+  one-liner), warn that the npx form does **not** put `dsh` on PATH (fresh terminals
+  fail with "command not found" unless commands are prefixed with
+  `npx @deepseek-ai/dsh`), and gain a FAQ entry covering it. No code changes.
+
 ## 0.1.4
 
 - Credential fallback chain: both legs now fall through to the launching

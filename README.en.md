@@ -56,13 +56,28 @@ lock on cross-machine installs.
 
 ## Quick Start
 
-Prerequisites: dsh installed and booted at least once, `pnpm` on PATH
+Prerequisites: the `dsh` CLI available and booted at least once, `pnpm` on PATH
 (`dsh plugin` installs plugins through pnpm).
 
-**Install** (from npm — the recommended path):
+**Step 1 — install `dsh` on a new machine (one-time, pick one).** `dsh` is the
+official CLI (npm package `@deepseek-ai/dsh`):
+
+```sh
+npm install -g @deepseek-ai/dsh        # recommended: dsh permanently on PATH
+# or (the official one-line launch):
+npx @deepseek-ai/dsh web               # no global install: CLI lives only in npx cache
+```
+
+> ⚠️ With the `npx` form, `dsh` does **not** enter PATH — a fresh terminal typing
+> bare `dsh` fails with "command not found". Either install globally, or prefix
+> every command with `npx @deepseek-ai/dsh`.
+
+**Step 2 — install** (from npm — the recommended path):
 
 ```sh
 dsh plugin --profile web add dsh-deepseek-vision
+# without a global install, use the npx prefix:
+npx @deepseek-ai/dsh plugin --profile web add dsh-deepseek-vision
 ```
 
 **Deploy & use:** restart `dsh web` once → pick **DeepSeek + Vision** on the Models
@@ -267,6 +282,13 @@ Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Contributing:
 - Descriptions consume DeepSeek context (a few hundred tokens per image, billed once).
 
 ## FAQ
+
+**`dsh` is missing / "command not found" on a new machine?** Install the official CLI
+first: `npm install -g @deepseek-ai/dsh` (one-time; `dsh` stays on PATH afterwards). If
+you launch via `npx @deepseek-ai/dsh web` (the official one-line way), the CLI runs only
+from the npx cache and is **not on PATH** — use the npx prefix for plugin commands:
+`npx @deepseek-ai/dsh plugin --profile web add dsh-deepseek-vision`. The plugin itself
+lives in the profile, independent of where the CLI comes from; one install is permanent.
 
 **Do I need to care about Node versions to install it?** Not for the official path
 (`dsh plugin add`); only the no-CLI replica needs Node 22.19+ / 24+ and `pnpm` on PATH.
