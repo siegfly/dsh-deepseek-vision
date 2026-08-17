@@ -1,6 +1,7 @@
 /**
  * Mount test for the client plugin half: the slot registration wiring (name,
- * id, order, locale, injected face) and the service dependencies it declares.
+ * key, id, order, locale, injected face) and the service dependencies it
+ * declares.
  * Services are stubbed through ctx.provide, exactly as the browser module
  * table would satisfy them.
  */
@@ -12,7 +13,7 @@ import * as client from '../src/client/index.js'
 import { nodeClientRuntimeAvailable } from './support/client-runtime.js'
 
 interface RegisteredCard {
-  options: { name: string; id: string; order: number; locale: string }
+  options: { name: string; key: string; id: string; order: number; locale: string }
   component: (props: never) => unknown
   inject: () => unknown
 }
@@ -78,6 +79,7 @@ describe.skipIf(!nodeClientRuntimeAvailable())('client plugin half', () => {
     expect(cards).toHaveLength(1)
     expect(cards[0]!.options).toMatchObject({
       name: 'settings.plugin.item',
+      key: 'llm-vl-gateway',
       id: 'vl-gateway',
       order: 30,
       locale: 'vl-gateway',

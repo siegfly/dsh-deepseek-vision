@@ -11,11 +11,17 @@ so releases keep installing on newer (or older) official dsh.
 
 ## 0.1.5
 
+- dsh 0.1.0-rc.7 compatibility: `settings.plugin.item` became a keyed slot (keyed by
+  the settings namespace) in rc.7, whereas rc.6 declared it as a `list` (id + order).
+  The card now registers once with BOTH shapes — `key` for rc.7, `id` + `order` for
+  rc.6 — so the same built bundle installs on either official version (the loader
+  validates only the field matching its declared kind and stores the rest). Anchor
+  bumped to `dsh@0.1.0-rc.7`; the committed `lib/` was rebuilt against it.
 - Docs: READMEs now explain how to install the `dsh` CLI itself on a new machine
   (global `npm install -g @deepseek-ai/dsh` vs. the `npx @deepseek-ai/dsh web`
   one-liner), warn that the npx form does **not** put `dsh` on PATH (fresh terminals
   fail with "command not found" unless commands are prefixed with
-  `npx @deepseek-ai/dsh`), and gain a FAQ entry covering it. No code changes.
+  `npx @deepseek-ai/dsh`), and gain a FAQ entry covering it.
 
 ## 0.1.4
 

@@ -21,7 +21,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { VlGatewayCard } from './card.js'
-import { VlGatewayCardController } from './controller.js'
+import { GATEWAY_SETTINGS_NS, VlGatewayCardController } from './controller.js'
 import { NS, en, zh } from './locales.js'
 
 /** Required services (cordis fiber inject). */
@@ -84,13 +84,23 @@ export function apply(ctx: ClientContext): void {
     'vl-gateway: credential invalidations',
   )
 
+  // One registration carries BOTH slot shapes so the same built bundle installs
+  // on rc.6 and rc.7: rc.7 keyed `settings.plugin.item` by the settings
+  // namespace (`key`), while rc.6 declared it as a `list` (`id` + `order`).
+  // The loader validates only the field matching its declared kind and stores
+  // the rest, so a single entry satisfies either. Hoisted (not inlined) so the
+  // other version's fields are not fresh-literal excess-property errors.
+  // Retire `id`/`order` and re-inline once the rc.6 support line is dropped.
+  const cardEntry = {
+    name: 'settings.plugin.item',
+    key: GATEWAY_SETTINGS_NS,
+    id: 'vl-gateway',
+    order: 30,
+    locale: NS,
+    inject: () => controller.inject(),
+  } as const
+
   ctx.slots.inject('settings.plugin.item', function* () {
-    yield ctx.slots.register({
-      name: 'settings.plugin.item',
-      id: 'vl-gateway',
-      order: 30,
-      locale: NS,
-      inject: () => controller.inject(),
-    }, VlGatewayCard)
+    yield ctx.slots.register(cardEntry, VlGatewayCard)
   })
 }
