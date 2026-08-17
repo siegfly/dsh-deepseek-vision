@@ -49,7 +49,7 @@ jobs:
   # Foreign-machine path: no source checkout, only the npm-published dsh
   # (pinned at 0.1.0-rc.6). Builds the fake healed fallback, then exercises
   # the exact steps a user machine runs: install, build, test, check-compat
-  # (expected exit 1: target rc.6 vs anchor rc.5 = advisory), install-profile.
+  # (expected exit 1: target rc.6 vs anchor rc.7 = advisory), install-profile.
   installed-mode:
     strategy:
       fail-fast: false
@@ -105,7 +105,7 @@ jobs:
       - run: pnpm build
       - name: Tests (client suites self-skip, npm ships the client runtime browser-only)
         run: pnpm test
-      - name: Compatibility check (target rc.6 vs anchor rc.5 = advisory exit 1)
+      - name: Compatibility check (target rc.6 vs anchor rc.7 = advisory exit 1)
         shell: bash
         run: |
           code=0
