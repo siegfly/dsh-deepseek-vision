@@ -14,13 +14,15 @@
 model gains image support through a "gateway" provider route: pasted images are first
 described verbatim by a configurable VL model (Qwen-VL by default), then the description
 replaces the image for the DeepSeek wire. Zero changes to the official repo, no version
-lock on cross-machine installs.
+lock on cross-machine installs. Among the dsh vision plugins it is the **thinnest
+bridge**: no injected agent tools, no third-party relay, no local model requirement.
 
 [English](README.en.md) | [中文](README.md)
 
 ## Table of Contents
 
 - [Highlights](#highlights)
+- [Why This One](#why-this-one)
 - [Quick Start](#quick-start)
 - [What It Does](#what-it-does)
 - [How It Works](#how-it-works)
@@ -53,6 +55,35 @@ lock on cross-machine installs.
 - **No cross-version lock-in:** releases do not pin an official dsh version — installs
   rebuild on the target machine against its own dsh; a successful build is the proof of
   compatibility, and pre-install checks grade differences instead of failing silently.
+
+## Why This One
+
+Dozens of dsh vision plugins appeared within hours of the official harness launch, with
+different mechanisms and trade-offs. This plugin's position is one sentence: **the
+thinnest bridge** — one provider route, and nothing else.
+
+- **No injected agent tools:** no `vision_describe` / `analyze_image`-style tools; the
+  agent's behavior surface is unchanged, and pasting an image stays the plain "paste"
+  path.
+- **No third-party relay:** no anonymous fallback endpoints, no proxy servers, no
+  on-disk answer cache — images only ever pass through **the VL endpoint you
+  configured** (your key, your endpoint, your data).
+- **No local model dependency:** no Python / MLX / llama.cpp / Ollama requirements;
+  install and go.
+- **Official-grade release quality:** official bundle install mechanism, pre-install
+  compatibility gates, build-anchor stamp, 102 tests / 97% coverage, bilingual docs.
+
+| Dimension | This plugin | Tool-style (e.g. [dsh-vision-any](https://github.com/tianmingwan/dsh-vision-any), [dsh-vision](https://github.com/linenxi-ctrl/dsh-vision)) | Router-style (e.g. [dsh-vision-router](https://github.com/ysr666/dsh-vision-router)) | Proxy-style (e.g. [dsh-vision-proxy](https://github.com/Flyvhidbwo/dsh-vision-proxy)) | Local-pipeline (e.g. [DeepSeek-Harness-Vision-Tools](https://github.com/tonyd2wild/DeepSeek-Harness-Vision-Tools)) |
+| --- | --- | --- | --- | --- | --- |
+| Mechanism | provider gateway route | injected agent tools | tools + multi-provider routing | transparent proxy route | Python local VLM pipeline |
+| Image data flow | your VL endpoint only | your own API | includes a third-party anonymous fallback | own endpoint + fallback chains | local model, never leaves the machine |
+| Swap VL model | settings card, zero code | config files | config files | config + Ollama auto-detect | swap local model |
+| Answer/description cache | in-process LRU (descriptions only) | — | content-hash answer cache | SHA-256 cache | — |
+| Failure semantics | fail-closed + stable error codes | — | — | timeout protection | — |
+| Release path | official bundle mechanism + compat gates + anchor stamp | — | — | — | non-bundle |
+
+> The table lists directional differences only; every project is iterating fast — check
+> each project's latest README before choosing.
 
 ## Quick Start
 

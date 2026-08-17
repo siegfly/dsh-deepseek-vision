@@ -13,12 +13,14 @@
 **dsh-deepseek-vision 是给 DeepSeek Harness 的视觉语言网关插件。** 纯文本的 DeepSeek 编程模型
 通过一个"网关"provider 路由获得贴图能力：图片先由可配置的视觉模型（默认 Qwen-VL）
 逐字描述成文字，再交给 DeepSeek 继续写代码。官方仓库零改动、跨机器安装不锁官方版本。
+同类方案里它是**最薄的桥**：不注入 agent 工具、不经过第三方中转、不依赖本地模型。
 
 [English](README.en.md) | [中文](README.md)
 
 ## 目录
 
 - [亮点](#亮点)
+- [为什么选它](#为什么选它)
 - [快速开始](#快速开始)
 - [效果](#效果)
 - [工作原理](#工作原理)
@@ -47,6 +49,30 @@
   `IMAGE_TOO_LARGE`…），或 `placeholder` 降级为文字占位继续。
 - **跨版本不锁死：** 发布版不锁定官方 dsh 版本——目标机安装时用**自己的** dsh 重建，
   构建成功即兼容证明；装前检查分级提示，绝不静默失败。
+
+## 为什么选它
+
+dsh 视觉插件生态在官方 harness 发布后的几十小时内密集涌现，机制与取舍各不相同。本插件的
+立场是一句话：**最薄的桥**——只加一条 provider 路由，其余什么都别加。
+
+- **不注入 agent 工具**：不新增 `vision_describe` / `analyze_image` 之类的工具，agent
+  的行为面不变，贴图走的就是"贴图"这条原路；
+- **不经过第三方中转**：没有匿名回退端点、没有代理服务器、没有磁盘答案缓存——图片
+  只经过**你自己配置的 VL 端点**（你的 key、你的端点、你的数据）；
+- **不依赖本地模型**：无 Python / MLX / llama.cpp / Ollama 要求，装上即用；
+- **与官方插件同一发布质量**：官方 bundle 机制安装、装前兼容门禁、构建锚点章、
+  102 个测试 / 97% 覆盖率、双语文档。
+
+| 维度 | 本插件 | 工具型（如 [dsh-vision-any](https://github.com/tianmingwan/dsh-vision-any)、[dsh-vision](https://github.com/linenxi-ctrl/dsh-vision)） | 路由型（如 [dsh-vision-router](https://github.com/ysr666/dsh-vision-router)） | 代理型（如 [dsh-vision-proxy](https://github.com/Flyvhidbwo/dsh-vision-proxy)） | 本地管线型（如 [DeepSeek-Harness-Vision-Tools](https://github.com/tonyd2wild/DeepSeek-Harness-Vision-Tools)） |
+| --- | --- | --- | --- | --- | --- |
+| 机制 | provider 网关路由 | 注入 agent 工具 | 工具 + 多供应商路由 | 透明代理路由 | Python 本地 VLM 管线 |
+| 图片数据流 | 只经你自己的 VL 端点 | 你自己的 API | 含第三方匿名回退 | 自有端点 + 回退链 | 本地模型，不出网 |
+| 换 VL 模型 | 设置卡片，零改码 | 配置文件 | 配置文件 | 配置 + 自动探测 Ollama | 换本地模型 |
+| 答案/描述缓存 | 进程内 LRU（仅描述） | — | 内容哈希答案缓存 | SHA-256 缓存 | — |
+| 失败语义 | fail-closed + 稳定错误码 | — | — | 超时保护 | — |
+| 发布链路 | 官方 bundle 机制 + 兼容门禁 + 锚点章 | — | — | — | 非 bundle |
+
+> 上表只列方向性差异，各项目仍在快速迭代；选型时请以各项目最新 README 为准。
 
 ## 快速开始
 
