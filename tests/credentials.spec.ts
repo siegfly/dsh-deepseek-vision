@@ -6,7 +6,7 @@
  */
 
 import { createServer, type Server } from 'node:http'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -103,13 +103,23 @@ async function makeHarness(
   return { ctx, dispose: () => fiber.dispose() }
 }
 
+const originalEnvironment = {
+  deepseek: process.env.DEEPSEEK_API_KEY,
+  vl: process.env.QWEN_VL_API_KEY,
+}
+
 // No ambient keys: every case below provisions its own key source.
 beforeAll(() => {
   delete process.env.DEEPSEEK_API_KEY
   delete process.env.QWEN_VL_API_KEY
 })
 
-afterAll(() => {})
+afterAll(() => {
+  if (originalEnvironment.deepseek === undefined) delete process.env.DEEPSEEK_API_KEY
+  else process.env.DEEPSEEK_API_KEY = originalEnvironment.deepseek
+  if (originalEnvironment.vl === undefined) delete process.env.QWEN_VL_API_KEY
+  else process.env.QWEN_VL_API_KEY = originalEnvironment.vl
+})
 
 describe('credentials seam', () => {
   it('resolves both legs from the credentials service when one is mounted', async () => {
@@ -145,7 +155,11 @@ describe('credentials seam', () => {
     )
   })
 
-  it('falls back to the launch environment when the seam is mounted but lacks the entry', async () => {
+  it('does not bypass a mounted credentials service when it resolves no key', async () => {
+    const mountedButEmptyCredentials = {
+      resolve: async () => undefined,
+    } as Pick<Context['credentials'], 'resolve'>
+    process.env.DEEPSEEK_API_KEY = 'sk-ds-launch-must-not-leak'
     process.env.QWEN_VL_API_KEY = 'sk-vl-env-fallback'
     try {
       await withServer(
@@ -154,17 +168,56 @@ describe('credentials seam', () => {
           await withServer(
             { status: 200, payload: { choices: [{ message: { content: 'described via env fallback' } }] } },
             async (vl, vlPort) => {
-              const home = mkdtempSync(join(tmpdir(), 'dsh-creds-'))
+              const harness = await makeHarness(deepseekPort, vlPort)
               try {
-                const harness = await makeHarness(deepseekPort, vlPort, { path: join(home, '.credentials.yaml') })
+                harness.ctx.provide('credentials', mountedButEmptyCredentials as Context['credentials'])
+                const chunks = await drain(harness.ctx.llm.stream(imageRequest()))
+                expect(chunks.at(-1)).toMatchObject({
+                  type: 'finish',
+                  reason: { kind: 'error', failure: { code: 'MISSING_CREDENTIAL' } },
+                })
+                expect(vl.calls).toBe(0)
+                expect(deepseek.calls).toBe(0)
+              } finally {
+                await harness.dispose()
+              }
+            },
+          )
+        },
+      )
+    } finally {
+      delete process.env.DEEPSEEK_API_KEY
+      delete process.env.QWEN_VL_API_KEY
+    }
+  })
+
+  it('credentials-local gives a process key priority over a pre-existing GUI file key', async () => {
+    process.env.DEEPSEEK_API_KEY = 'sk-ds-process-wins'
+    process.env.QWEN_VL_API_KEY = 'sk-vl-process-wins'
+    try {
+      await withServer(
+        { status: 500, payload: { error: { message: 'capture only' } } },
+        async (deepseek, deepseekPort) => {
+          await withServer(
+            { status: 200, payload: { choices: [{ message: { content: 'described with process key' } }] } },
+            async (vl, vlPort) => {
+              const home = mkdtempSync(join(tmpdir(), 'dsh-creds-'))
+              const path = join(home, '.credentials.yaml')
+              writeFileSync(path, 'DEEPSEEK_API_KEY: sk-ds-gui-file\nQWEN_VL_API_KEY: sk-vl-gui-file\n')
+              try {
+                const harness = await makeHarness(deepseekPort, vlPort, { path })
                 try {
-                  await harness.ctx.credentials.set(credentialRef('DEEPSEEK_API_KEY'), 'sk-ds-seam')
-                  // QWEN_VL_API_KEY is deliberately absent from the seam: the chain must
-                  // fall through to the launch environment for the vision leg.
+                  await expect(harness.ctx.credentials.resolve(credentialRef('DEEPSEEK_API_KEY')))
+                    .resolves.toMatchObject({ value: 'sk-ds-process-wins', source: 'env' })
+                  await expect(harness.ctx.credentials.resolve(credentialRef('QWEN_VL_API_KEY')))
+                    .resolves.toMatchObject({ value: 'sk-vl-process-wins', source: 'env' })
+                  await expect(harness.ctx.credentials.describe(credentialRef('DEEPSEEK_API_KEY')))
+                    .resolves.toMatchObject({ configured: true, source: 'env', writable: false })
+                  await expect(harness.ctx.credentials.describe(credentialRef('QWEN_VL_API_KEY')))
+                    .resolves.toMatchObject({ configured: true, source: 'env', writable: false })
                   await drain(harness.ctx.llm.stream(imageRequest()))
-                  expect(vl.authorization).toBe('Bearer sk-vl-env-fallback')
-                  expect(deepseek.authorization).toBe('Bearer sk-ds-seam')
-                  expect(vl.calls).toBe(1)
+                  expect(vl.authorization).toBe('Bearer sk-vl-process-wins')
+                  expect(deepseek.authorization).toBe('Bearer sk-ds-process-wins')
                 } finally {
                   await harness.dispose()
                 }
@@ -176,6 +229,7 @@ describe('credentials seam', () => {
         },
       )
     } finally {
+      delete process.env.DEEPSEEK_API_KEY
       delete process.env.QWEN_VL_API_KEY
     }
   })

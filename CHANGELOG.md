@@ -11,6 +11,11 @@ so releases keep installing on newer (or older) official dsh.
 
 ## 0.1.5
 
+- Credentials: align both gateway legs with the official rc.8 boundary. A mounted
+  `credentials` service is authoritative, including when it resolves no value;
+  only a profile without that service reads the launch environment directly.
+  `credentials-local` retains its official precedence: read-only process environment
+  first, GUI-managed `.credentials.yaml` second, then `.env` fallback.
 - dsh 0.1.0-rc.7 compatibility: `settings.plugin.item` became a keyed slot (keyed by
   the settings namespace) in rc.7, whereas rc.6 declared it as a `list` (id + order).
   The card now registers once with BOTH shapes — `key` for rc.7, `id` + `order` for

@@ -143,8 +143,11 @@ DeepSeek wire；reasoning efforts / context 窗口 / 默认 maxTokens / retry po
 
 ## 配置
 
-全部可省略（走默认值）。两个 key 都支持 credential-ref（环境变量名），凭据经 dsh 的
-credentials seam 解析（Web Models 页写入的凭据即可用），无 seam 时回退到启动环境变量：
+全部可省略（走默认值）。两个 key 都支持 credential-ref（环境变量名）。已挂载 dsh 的
+`credentials` 服务时，其解析结果（即使未配置）具有权威性；只有服务缺席才直接读取启动环境。
+官方 `credentials-local` 的优先级是：**进程环境变量（最高、只读）→ GUI 管理的
+`.credentials.yaml` → `.env` 回退**。因此 Web Models 页写入的凭据可用，而本次进程显式
+导出的 key 始终优先且不能在 GUI 内修改：
 
 | 路径 | 默认值 | 说明 |
 | --- | --- | --- |

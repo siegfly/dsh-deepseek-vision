@@ -161,8 +161,12 @@ inherited from the parent.
 ## Configuration
 
 Everything is optional (defaults apply). Both keys support credential-refs (environment
-variable names) resolved through dsh's credentials seam (credentials written on the Web
-Models page work), falling back to launch-time environment variables:
+variable names). When dsh's `credentials` service is mounted, its result is authoritative,
+including an unconfigured result; the route reads the launch environment directly only when
+that service is absent. Official `credentials-local` precedence is: **process environment
+(highest, read-only) → GUI-managed `.credentials.yaml` → `.env` fallback**. Credentials
+written on the Web Models page therefore work, while a key explicitly exported for this
+process always wins and cannot be changed in the GUI:
 
 | Path | Default | Notes |
 | --- | --- | --- |
