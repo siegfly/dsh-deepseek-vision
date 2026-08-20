@@ -16,7 +16,7 @@ needed. The author never has to follow official upgrades.
 
 ## Provenance, not an install gate
 
-- `package.json → dshCompat.anchorVersion` (currently `0.1.0-rc.7`) declares the build
+- `package.json → dshCompat.anchorVersion` (currently `0.1.0-rc.8`) declares the build
   provenance of the committed `lib/`. It is **not** an install gate.
 - `pnpm build` writes the actually resolved harness dsh version into the committed
   `lib/build-anchor.json`. The stamp makes provenance impossible to fake: a release whose

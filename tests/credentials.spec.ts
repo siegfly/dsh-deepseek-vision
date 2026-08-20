@@ -191,6 +191,43 @@ describe('credentials seam', () => {
     }
   })
 
+  it('does not bypass a mounted credentials service when only the DeepSeek key is missing', async () => {
+    const credentialsWithOnlyVlKey = {
+      resolve: async (ref: string) => ref === 'QWEN_VL_API_KEY'
+        ? { value: 'sk-vl-provider', source: 'test' }
+        : undefined,
+    } as Pick<Context['credentials'], 'resolve'>
+    process.env.DEEPSEEK_API_KEY = 'sk-ds-launch-must-not-leak'
+    try {
+      await withServer(
+        { status: 500, payload: { error: { message: 'capture only' } } },
+        async (deepseek, deepseekPort) => {
+          await withServer(
+            { status: 200, payload: { choices: [{ message: { content: 'described via provider key' } }] } },
+            async (vl, vlPort) => {
+              const harness = await makeHarness(deepseekPort, vlPort)
+              try {
+                harness.ctx.provide('credentials', credentialsWithOnlyVlKey as Context['credentials'])
+                const chunks = await drain(harness.ctx.llm.stream(imageRequest()))
+                expect(chunks.at(-1)).toMatchObject({
+                  type: 'finish',
+                  reason: { kind: 'error', failure: { code: 'MISSING_CREDENTIAL' } },
+                })
+                expect(vl.authorization).toBe('Bearer sk-vl-provider')
+                expect(vl.calls).toBe(1)
+                expect(deepseek.calls).toBe(0)
+              } finally {
+                await harness.dispose()
+              }
+            },
+          )
+        },
+      )
+    } finally {
+      delete process.env.DEEPSEEK_API_KEY
+    }
+  })
+
   it('credentials-local gives a process key priority over a pre-existing GUI file key', async () => {
     process.env.DEEPSEEK_API_KEY = 'sk-ds-process-wins'
     process.env.QWEN_VL_API_KEY = 'sk-vl-process-wins'

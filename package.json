@@ -41,7 +41,7 @@
     }
   },
   "dshCompat": {
-    "anchorVersion": "0.1.0-rc.7",
+    "anchorVersion": "0.1.0-rc.8",
     "note": "Provenance of the committed lib/ only, NOT an install gate: install-profile rebuilds on the target machine against its own installed dsh, so installs on newer/older official versions proceed with an advisory warning. Only an unbuilt release (missing stamp) or a drifted client preset blocks installation."
   },
   "files": [

@@ -142,7 +142,7 @@ function stageProfile(home: string, name: string, bundles: string[]): void {
 }
 
 /** Wait until the accumulated stdout carries the `dsh web:` URL line. */
-function waitForWebUrl(stdout: () => string, timeoutMs: number): Promise<string> {
+function waitForWebUrl(stdout: () => string, stderr: () => string, timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const started = Date.now()
     const timer = setInterval(() => {
@@ -154,7 +154,10 @@ function waitForWebUrl(stdout: () => string, timeoutMs: number): Promise<string>
       }
       if (Date.now() - started > timeoutMs) {
         clearInterval(timer)
-        reject(new Error(`dsh web never printed its URL; stdout so far: ${JSON.stringify(stdout())}`))
+        reject(new Error(
+          `dsh web never printed its URL; stdout so far: ${JSON.stringify(stdout())}; `
+          + `stderr so far: ${JSON.stringify(stderr())}`,
+        ))
       }
     }, 250)
   })
@@ -234,7 +237,7 @@ describe('real dsh boot smoke', () => {
       // The web bundle parses the profile layers (including this plugin's
       // bundle patch) before it binds; a broken layer crashes instead of
       // printing the URL.
-      const url = await waitForWebUrl(launched.stdout, 60_000)
+      const url = await waitForWebUrl(launched.stdout, launched.stderr, 60_000)
       const response = await fetch(url)
       expect(response.status).toBe(200)
     } finally {
@@ -279,7 +282,7 @@ describe('real dsh boot smoke', () => {
       const launched = launch(home, args, cwd, ['--profile', 'web', '--port', '0'])
       const killTimer = setTimeout(() => launched.child.kill('SIGKILL'), 90_000)
       try {
-        const url = await waitForWebUrl(launched.stdout, 60_000)
+        const url = await waitForWebUrl(launched.stdout, launched.stderr, 60_000)
         expect((await fetch(url)).status).toBe(200)
       } finally {
         clearTimeout(killTimer)
