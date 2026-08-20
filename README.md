@@ -37,7 +37,7 @@
 
 - **贴图即用，不用换模型：** 注册独立路由 `deepseek-vision`（显示名 *DeepSeek + Vision*），
   真实声明 `inputModalities: ['text','image']`——聊天窗贴图、`tool-fs read_image`、浏览器
-  截图工具全部放行。
+  截图、MCP 工具返回的图片、ACP 客户端内联图片全部放行。
 - **每张图只描述一次：** 按 `attachmentId` 进程内 LRU 缓存，重试、上下文压缩、后续轮次
   复用同一份描述，不重复计费。
 - **会话不变量保持：** 原始图片仍持久化进 session log，历史 / 回放 / 重构不受影响。
@@ -126,7 +126,7 @@ headless profile、其他 spec 形式（git / 目录 / tarball）、无 CLI 的�
 
 ```mermaid
 flowchart LR
-    User["聊天窗贴图 / read_image / 截图"] --> Gate["deepseek-vision 路由：inputModalities = text + image"]
+    User["聊天窗贴图 / read_image / 截图 / MCP / ACP"] --> Gate["deepseek-vision 路由：inputModalities = text + image"]
     Gate --> Persist["apiproxy prompt RPC → ImageBlock 持久化进 session log"]
     Persist --> Bridge["ImageBridge：改写图片块（含 tool-result 嵌套）"]
     VL["可配置 VL 模型（默认 qwen3-vl-flash，OpenAI 兼容端点）"] --> Bridge

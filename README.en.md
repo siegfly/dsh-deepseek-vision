@@ -39,7 +39,8 @@ bridge**: no injected agent tools, no third-party relay, no local model requirem
 
 - **Paste an image, keep your model:** registers the `deepseek-vision` route (display name
   *DeepSeek + Vision*) with a real `inputModalities: ['text','image']` declaration — chat
-  pastes, `tool-fs read_image`, and browser screenshot tools all get through.
+  pastes, `tool-fs read_image`, browser screenshot tools, MCP tool-returned images, and
+  ACP inline images all get through.
 - **Describe each image once:** per-`attachmentId` in-process LRU cache; retries,
   compaction, and later turns reuse the same description — no double billing.
 - **Session invariants hold:** original images stay persisted in the session log; history /
@@ -142,7 +143,7 @@ Select the **DeepSeek + Vision** provider in the chat:
 
 ```mermaid
 flowchart LR
-    User["chat paste / read_image / screenshot"] --> Gate["deepseek-vision route: inputModalities = text + image"]
+    User["chat paste / read_image / screenshot / MCP / ACP"] --> Gate["deepseek-vision route: inputModalities = text + image"]
     Gate --> Persist["apiproxy prompt RPC -> ImageBlock persisted to session log"]
     Persist --> Bridge["ImageBridge rewrites image blocks (incl. nested tool results)"]
     VL["configured VL model (default qwen3-vl-flash, OpenAI-compatible endpoint)"] --> Bridge

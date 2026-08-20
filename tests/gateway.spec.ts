@@ -1,7 +1,9 @@
 /**
  * Adapter-level tests: the gateway claims image input, delegates catalog and
  * reasoning metadata to the DeepSeek parent, and rewrites images out of the
- * request before the text-only wire is called.
+ * request before the text-only wire is called. The image-source tests cover
+ * the shapes rc.7 bridges through the durable attachment store — ACP inline
+ * images (top-level) and MCP tool-returned images (nested in tool results).
  */
 
 import { createServer, type Server } from 'node:http'
@@ -10,7 +12,7 @@ import { resolveAdapterOptions } from '@deepseek-ai/dsh-llm-deepseek'
 import type { ResolvedDeepSeekOptions } from '@deepseek-ai/dsh-llm-deepseek'
 import type { AnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
 import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import type { GenerateOptions, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { CallId, GenerateOptions, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { ImageBridge } from '../src/bridge.js'
 import { GATEWAY_INPUT_MODALITIES, VisionGatewayAdapter } from '../src/gateway.js'
 
@@ -231,6 +233,59 @@ describe('VisionGatewayAdapter', () => {
       const body = captured.body as { messages: { content: unknown }[] }
       const wire = JSON.stringify(body)
       expect(wire).toContain('a wiring diagram')
+      expect(wire).not.toContain('image_url')
+      expect(wire).not.toContain('data:image')
+      expect(wire).not.toContain('"type":"image"')
+    })
+  })
+})
+
+describe('image sources (MCP / ACP)', () => {
+  /** ACP inline image: a top-level user image block (rc.7 `admitAcpPrompt` shape). */
+  function acpInlineImageRequest(): GenerateOptions {
+    const messages: Message[] = [{
+      role: 'user',
+      content: [{ type: 'text', text: 'inspect this' }, { type: 'image', attachment: REF }],
+      source: { kind: 'user' },
+    }]
+    return { provider: 'deepseek-vision', model: 'deepseek-v4-flash', messages }
+  }
+
+  /** MCP tool result: an image nested in a tool-result block (rc.7 `prepareImageProjection` shape). */
+  function mcpToolResultImageRequest(): GenerateOptions {
+    const messages: Message[] = [{
+      role: 'user',
+      content: [{
+        type: 'tool-result',
+        toolCallId: 'mcp-screenshot-1' as CallId,
+        isError: false,
+        content: [{ type: 'image', attachment: REF }],
+      }],
+      source: { kind: 'user' },
+    }]
+    return { provider: 'deepseek-vision', model: 'deepseek-v4-flash', messages }
+  }
+
+  it('describes an ACP inline image before the DeepSeek wire', async () => {
+    await withStreamingDeepSeekServer(async (captured, port) => {
+      const adapter = makeAdapter(port, async () => 'an ACP screenshot')
+      const chunks = await drain(adapter.stream(acpInlineImageRequest()))
+      expect(chunks.map(chunk => chunk.type)).toContain('finish')
+      const wire = JSON.stringify(captured.body)
+      expect(wire).toContain('an ACP screenshot')
+      expect(wire).not.toContain('image_url')
+      expect(wire).not.toContain('data:image')
+      expect(wire).not.toContain('"type":"image"')
+    })
+  })
+
+  it('describes an MCP tool-result image before the DeepSeek wire', async () => {
+    await withStreamingDeepSeekServer(async (captured, port) => {
+      const adapter = makeAdapter(port, async () => 'an MCP screenshot')
+      const chunks = await drain(adapter.stream(mcpToolResultImageRequest()))
+      expect(chunks.map(chunk => chunk.type)).toContain('finish')
+      const wire = JSON.stringify(captured.body)
+      expect(wire).toContain('an MCP screenshot')
       expect(wire).not.toContain('image_url')
       expect(wire).not.toContain('data:image')
       expect(wire).not.toContain('"type":"image"')
