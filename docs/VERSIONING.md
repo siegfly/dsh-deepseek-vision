@@ -5,6 +5,12 @@ and when the author must ship a new release.
 
 ## The core promise
 
+> Scope: this policy covers the **no-CLI replica path** (`pnpm install-profile`, i.e.
+> `scripts/install-profile.mjs`). The official `dsh plugin add` path installs published
+> artifacts as-is (built at publish time / committed `lib/`) — it does not rebuild on the
+> target machine and runs no compatibility gate; the README's Version Alignment section
+> spells out the difference.
+
 The plugin's runtime `@deepseek-ai/*` imports resolve from **the target machine's own dsh
 install** (the official healed fallback under `$DSH_HOME/profiles/node_modules`), and the
 install script **rebuilds the plugin on the target machine, with the target machine's own

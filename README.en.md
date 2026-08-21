@@ -53,9 +53,13 @@ bridge**: no injected agent tools, no third-party relay, no local model requirem
   OpenRouter, LM Studio…).
 - **Explicit failure semantics:** fail-closed by default with stable error codes
   (`AUTH` / `TIMEOUT` / `TRANSPORT` / `IMAGE_TOO_LARGE`…), or `placeholder` to degrade.
-- **No cross-version lock-in:** releases do not pin an official dsh version — installs
-  rebuild on the target machine against its own dsh; a successful build is the proof of
-  compatibility, and pre-install checks grade differences instead of failing silently.
+- **No cross-version lock-in:** releases do not pin an official dsh version. The no-CLI
+  replica path (`pnpm install-profile`) rebuilds on the target machine against its own
+  dsh — a successful build is the proof of compatibility, and pre-install checks grade
+  differences instead of failing silently; the official `dsh plugin add` path installs
+  published artifacts as-is with no target rebuild — runtime imports resolve through the
+  healed fallback, but compatibility is not verified on the target (see [Version
+  Alignment](#version-alignment)).
 
 ## Why This One
 
@@ -243,14 +247,18 @@ Headless profiles work the same: `dsh plugin --profile headless add dsh-deepseek
 `dsh --profile web --dump-config | grep llm-vl-gateway`. Uninstall mirrors install for
 every form: `dsh plugin --profile <name> remove dsh-deepseek-vision`.
 
-Without the CLI, use the equivalent replica (needs Node 22.19+ or 24+ and `pnpm` on PATH; init layout → pnpm add → bundles reconcile):
+Without the CLI, use the equivalent replica (needs Node 22.19+ or 24+ and `pnpm` on PATH;
+init layout → target rebuild → compat gate → pnpm add → bundles reconcile):
 
 ```powershell
 pnpm install        # devDeps only (typescript/vitest), never @deepseek-ai/*
 pnpm install-profile          # or node scripts/install-profile.mjs [profile] [dshHome]
 ```
 
-Both paths do the same thing: link `dsh-deepseek-vision` into the profile's node_modules
+This is the only install path that rebuilds on the target machine: `install-profile`
+recompiles the plugin against the target's own dsh types and runs the `check-compat.mjs`
+gate before installing into the profile (see [Version Alignment](#version-alignment)).
+Both paths do the following: link `dsh-deepseek-vision` into the profile's node_modules
 (runtime `@deepseek-ai/*` imports resolve through the official healed fallback to the
 **same** dsh install — one shared cordis instance, no dual-instance issues); reconcile the
 package into `dsh.profile.bundles`; and, when the profile layout is missing, create it with
@@ -263,21 +271,32 @@ official `initProfile` semantics (manifest + empty user patch layer +
 
 ## Version Alignment
 
-Runtime `@deepseek-ai/*` imports resolve from **the target machine's own dsh install**
-(healed fallback), and the installer **rebuilds the plugin on the target machine with the
-target machine's own dsh types** before checking. Therefore:
+The two install paths differ in compatibility strategy:
 
-> **Releases pin no official version** — installs proceed on newer (or older) official dsh;
-> a successful build is itself the compatibility proof. A future official release that
-> changes an API this plugin uses fails the build with a clear tsc error — only then is a
-> new release needed.
+- **Official CLI path** (`dsh plugin add`, npm / git / tarball): installs published
+  artifacts as-is — the npm package was built at publish time, the git form uses the
+  committed `lib/`, the tarball is an author-packed artifact. **No target-machine rebuild
+  and no compatibility gate.** Runtime `@deepseek-ai/*` imports resolve from the target
+  machine's own dsh install (healed fallback); if the target official dsh's API does not
+  match this plugin's compiled artifacts, install does not fail early — the problem shows
+  up at startup or first use. Check the target dsh is roughly on the generation that
+  `dshCompat.anchorVersion` declares before installing.
+- **No-CLI replica path** (`pnpm install-profile`): **rebuilds the plugin on the target
+  machine with the target machine's own dsh types** before checking. Only this path
+  offers "a successful build is the compatibility proof":
+
+> On the replica path, releases pin no official version — installs proceed on newer (or
+> older) official dsh; a successful build is itself the compatibility proof. A future
+> official release that changes an API this plugin uses fails the build with a clear tsc
+> error — only then is a new release needed.
 
 - `dshCompat.anchorVersion` records the build provenance of the committed `lib/` — a
   provenance note, not an install gate; `lib/build-anchor.json` (written by `pnpm build`)
   keeps that provenance honest.
 - `node scripts/check-compat.mjs [dshHome]` grades the target machine before install:
   exact match = exit 0; any difference = exit 1, advisory, proceed; unbuilt release or
-  preset drift = refuse (env overrides available).
+  preset drift = refuse (env overrides available). The check **runs only inside
+  `install-profile`**; the official CLI path never calls it.
 
 Full policy, exit-code grades, and release triggers: [docs/VERSIONING.md](docs/VERSIONING.md).
 

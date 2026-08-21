@@ -47,8 +47,11 @@
   OpenAI 风格 `/chat/completions` 网关（DashScope、vLLM、OpenRouter、LM Studio…）。
 - **失败语义明确：** 默认 fail-closed，稳定错误码（`AUTH` / `TIMEOUT` / `TRANSPORT` /
   `IMAGE_TOO_LARGE`…），或 `placeholder` 降级为文字占位继续。
-- **跨版本不锁死：** 发布版不锁定官方 dsh 版本——目标机安装时用**自己的** dsh 重建，
-  构建成功即兼容证明；装前检查分级提示，绝不静默失败。
+- **跨版本不锁死：** 发布版不锁定官方 dsh 版本。无 CLI 复刻路径（`pnpm
+  install-profile`）在目标机用**自己的** dsh 重建，构建成功即兼容证明，装前分级
+  提示、绝不静默失败；官方 CLI 路径（`dsh plugin add`）直接安装发布产物，不在
+  目标机重建——运行时依赖经 healed fallback 解析，但兼容性未经目标机验证
+  （见[版本对齐](#版本对齐)）。
 
 ## 为什么选它
 
@@ -217,14 +220,17 @@ headless 同理：`dsh plugin --profile headless add dsh-deepseek-vision`（客�
 web 生效）。验证 bundle 层已挂载：`dsh --profile web --dump-config | grep llm-vl-gateway`。
 卸载与安装一一对应：`dsh plugin --profile <name> remove dsh-deepseek-vision`。
 
-无 CLI 的机器用等价复刻（需 Node 22.19+ 或 24+、PATH 里有 `pnpm`；init 布局 → pnpm add → bundles 对账）：
+无 CLI 的机器用等价复刻（需 Node 22.19+ 或 24+、PATH 里有 `pnpm`；init 布局 → 目标机
+重建 → 兼容门禁 → pnpm add → bundles 对账）：
 
 ```powershell
 pnpm install        # 只装 devDeps（typescript/vitest），不会装 @deepseek-ai/*
 pnpm install-profile          # 或 node scripts/install-profile.mjs [profile] [dshHome]
 ```
 
-两种方式做同样的事：
+这是唯一在目标机重建的安装路径：`install-profile` 先用目标机自己的 dsh 类型重新构建
+插件并通过 `check-compat.mjs` 门禁，再装入 profile（见[版本对齐](#版本对齐)）。
+两条路径都做下面两件事：
 
 - 把 `dsh-deepseek-vision` 链接进 profile 的 node_modules（运行时 `@deepseek-ai/*` 依赖经
   官方 healed fallback 解析到**同一个** dsh 安装，共享同一个 cordis 实例，无双实例问题）；
@@ -240,17 +246,28 @@ pnpm install-profile          # 或 node scripts/install-profile.mjs [profile] [
 
 ## 版本对齐
 
-插件的运行时 `@deepseek-ai/*` 依赖从**目标机器自己的 dsh 安装**解析（healed fallback），
-且安装脚本在检查之前会**先在目标机器上用目标机器自己的 dsh 类型重新构建**插件。因此：
+两条安装路径的兼容性策略不同：
 
-> **发布版不锁定任何官方版本**——目标机器用比锚点更新（或更旧）的官方 dsh 都可以安装；
-> 构建成功本身就是兼容性证明。若新官方版改了本插件用到的 API，构建会自然失败并给出明确
-> 的 tsc 错误，那时才需要发新版适配。**作者无需跟随官方每次升级重新发布。**
+- **官方 CLI 路径**（`dsh plugin add`，npm / git / tarball）：直接安装发布产物——
+  npm 包在作者发布时构建，git 形式使用提交的 `lib/`，tarball 是作者打包的产物，
+  **都不在目标机重建，也没有兼容门禁**。运行时 `@deepseek-ai/*` 依赖从目标机自己的
+  dsh 安装解析（healed fallback）；若目标机官方 dsh 的 API 与本插件编译产物不匹配，
+  安装不会提前失败，问题会在启动或调用时显现。装前请自行确认目标 dsh 与
+  `dshCompat.anchorVersion` 声明的代际大致一致。
+- **无 CLI 复刻路径**（`pnpm install-profile`）：安装前**先在目标机用目标机自己的
+  dsh 类型重新构建**插件，再跑 `check-compat.mjs` 分级门禁。只有这条路径提供
+  “构建成功即兼容证明”：
+
+> 无 CLI 复刻路径下，发布版不锁定任何官方版本——目标机器用比锚点更新（或更旧）的
+> 官方 dsh 都可以安装；构建成功本身就是兼容性证明。若新官方版改了本插件用到的 API，
+> 构建会自然失败并给出明确的 tsc 错误，那时才需要发新版适配。**作者无需跟随官方每次
+> 升级重新发布。**
 
 - `dshCompat.anchorVersion` 只声明提交的 `lib/` 的**构建出处**（出处声明，不是安装
   许可）；`pnpm build` 写入的 `lib/build-anchor.json` 让出处无法撒谎。
 - `node scripts/check-compat.mjs [dshHome]` 安装前对目标机分级：完全一致 = exit 0；
   **任何不一致 = exit 1 提示并放行**；残缺发布 / 复刻漂移 = 拒绝（有环境变量强制开关）。
+  该检查**只在 `install-profile` 里运行**，官方 CLI 路径不会调用它。
 
 完整策略、退出码分级与发版触发条件：[docs/VERSIONING.md](docs/VERSIONING.md)。
 
