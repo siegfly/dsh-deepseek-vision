@@ -253,7 +253,7 @@ recommendation:
 dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git (recommended), pinned commit
 dsh plugin --profile web add dsh-deepseek-vision                          # npm (published 0.1.7)
 dsh plugin --profile web add file:<repo path>                        # local directory (dev)
-dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
+dsh plugin --profile web add ./dsh-deepseek-vision-0.1.7.tgz              # tarball (npm pack artifact)
 ```
 
 Headless profiles work the same: `dsh plugin --profile headless add dsh-deepseek-vision`

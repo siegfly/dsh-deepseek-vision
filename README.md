@@ -223,7 +223,7 @@ manifest 的 `dsh.profile.bundles` 层栈，loader 启动时按层挂载——**
 dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git（推荐），锁 commit
 dsh plugin --profile web add dsh-deepseek-vision                          # npm（已发布 0.1.7）
 dsh plugin --profile web add file:<本仓库路径>                        # 本地目录（开发）
-dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
+dsh plugin --profile web add ./dsh-deepseek-vision-0.1.7.tgz              # tarball（npm pack 产物）
 ```
 
 headless 同理：`dsh plugin --profile headless add dsh-deepseek-vision`（客户端卡片只在
