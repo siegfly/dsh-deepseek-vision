@@ -339,8 +339,8 @@ both profiles; the settings card is web-only, and headless configures via `setti
 official `selectModel` gate rejects text-only models for image-bearing sessions. New
 sessions are unaffected; reinstalling restores the gateway route.
 
-**Why not send the image to DeepSeek directly?** The official DeepSeek API is text-only
-(rejects `image_url`), so a VL model describes the image first — no model swap, no
+**Why not send the image to DeepSeek directly?** DeepSeek's text-only models reject
+`image_url`, so a VL model describes the image first — no model swap, no
 information loss.
 
 ## License

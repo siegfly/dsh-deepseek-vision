@@ -305,8 +305,8 @@ dsh-deepseek-vision`——插件本身装在 profile 里，与 CLI 从哪来无�
 **卸载后，含图历史会话选不了模型？** 属预期行为：官方 `selectModel` 按
 `inputModalities` 拒绝文本模型接入含图会话。新会话不受影响，重装即恢复。
 
-**为什么图片不直接发给 DeepSeek？** 官方 DeepSeek 接口是纯文本的（会拒绝
-`image_url`），所以先由 VL 模型描述成文字再转发——不换模型、不丢信息。
+**为什么图片不直接发给 DeepSeek？** 官方 DeepSeek 接口对纯文本模型会拒绝
+`image_url`，所以先由 VL 模型描述成文字再转发——不换模型、不丢信息。
 
 ## 许可
 
