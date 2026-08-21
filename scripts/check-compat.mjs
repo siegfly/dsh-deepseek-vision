@@ -152,12 +152,6 @@ export function extractRegexSource(source, name) {
   return match[1].replace(/\s+$/, '').replace(/\/$/, '')
 }
 
-/** The content of one single-quoted literal (`const NAME = '…'`). */
-function extractStringLiteral(source, name) {
-  const match = new RegExp(`(?:const|export const) ${name} = '([^']*)'`).exec(source)
-  return match === null ? undefined : match[1]
-}
-
 /** The content of one assigned literal (`banner: `…`,` or `footer: '…',`). */
 function extractAssignedLiteral(source, name) {
   const backtick = new RegExp(`${name}: \`([^\\n]*)\``).exec(source)
@@ -166,14 +160,13 @@ function extractAssignedLiteral(source, name) {
   return single === null ? undefined : single[1]
 }
 
-/** The official CLIENT_EXTERNALS: PLATFORM_MODULES plus the runtime-store exemption. */
+/** The official CLIENT_EXTERNALS: the frozen module table plus its preloads. */
 export function officialExternals(checkoutRoot) {
   const platform = readFileSync(join(checkoutRoot, 'packages', 'client', 'web', 'src', 'platform.ts'), 'utf8')
-  const preset = readFileSync(join(checkoutRoot, 'packages', 'client', 'tsdown.client.ts'), 'utf8')
   const modules = extractStringArray(platform, 'PLATFORM_MODULES')
-  const exemption = extractStringLiteral(preset, 'RUNTIME_STORE_EXEMPTION')
-  if (modules === undefined || exemption === undefined) return undefined
-  return [...modules, exemption]
+  const preloaded = extractStringArray(platform, 'PRELOADED_CLIENT_EXTERNALS')
+  if (modules === undefined || preloaded === undefined) return undefined
+  return [...modules, ...preloaded]
 }
 
 /** Read this repo's frozen tsdown replica into comparable values. */

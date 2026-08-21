@@ -1,8 +1,8 @@
 # dsh-deepseek-vision
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
-[![](https://img.shields.io/badge/release-v0.1.5-5B4CF0?style=flat-square)](./CHANGELOG.md)
-[![](https://img.shields.io/badge/verified-102%20tests-2EA44F?style=flat-square)](./tests)
+[![](https://img.shields.io/badge/release-v0.1.7-5B4CF0?style=flat-square)](./CHANGELOG.md)
+[![](https://img.shields.io/badge/verified-111%20tests-2EA44F?style=flat-square)](./tests)
 [![](https://img.shields.io/badge/coverage-97%25-brightgreen?style=flat-square)](./vitest.config.ts)
 [![](https://img.shields.io/badge/license-MIT-0B7285?style=flat-square)](./LICENSE)
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
@@ -11,11 +11,13 @@
 **Install:** `dsh plugin --profile web add dsh-deepseek-vision`
 
 **A vision-language gateway plugin for DeepSeek Harness.** A text-only DeepSeek coding
-model gains image support through a "gateway" provider route: pasted images are first
-described verbatim by a configurable VL model (Qwen-VL by default), then the description
-replaces the image for the DeepSeek wire. Zero changes to the official repo, no version
-lock on cross-machine installs. Among the dsh vision plugins it is the **thinnest
-bridge**: no injected agent tools, no third-party relay, no local model requirement.
+model gains image support through a "gateway" provider route: models the catalog
+declares image-capable (official `deepseek-v4-flash-vision-exp`) stream images natively
+to DeepSeek's vision endpoint; every other model gets pasted images described verbatim
+by a configurable VL model (Qwen-VL by default) before the text-only wire. Zero changes
+to the official repo, no version lock on cross-machine installs. Among the dsh vision
+plugins it is the **thinnest bridge**: no injected agent tools, no third-party relay, no
+local model requirement.
 
 [English](README.en.md) | [中文](README.md)
 
@@ -76,7 +78,7 @@ thinnest bridge** — one provider route, and nothing else.
 - **No local model dependency:** no Python / MLX / llama.cpp / Ollama requirements;
   install and go.
 - **Official-grade release quality:** official bundle install mechanism, pre-install
-  compatibility gates, build-anchor stamp, 102 tests / 97% coverage, bilingual docs.
+  compatibility gates, build-anchor stamp, 111 tests / 97% coverage, bilingual docs.
 
 | Dimension | This plugin | Tool-style (e.g. [dsh-vision-any](https://github.com/tianmingwan/dsh-vision-any), [dsh-vision](https://github.com/linenxi-ctrl/dsh-vision)) | Router-style (e.g. [dsh-vision-router](https://github.com/ysr666/dsh-vision-router)) | Proxy-style (e.g. [dsh-vision-proxy](https://github.com/Flyvhidbwo/dsh-vision-proxy)) | Local-pipeline (e.g. [DeepSeek-Harness-Vision-Tools](https://github.com/tonyd2wild/DeepSeek-Harness-Vision-Tools)) |
 | --- | --- | --- | --- | --- | --- |
@@ -116,7 +118,7 @@ dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 npx @deepseek-ai/dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 ```
 
-The published npm version (0.1.5) works too — just swap the spec for
+The published npm version (0.1.7) works too — just swap the spec for
 `dsh-deepseek-vision`.
 
 **Deploy & use:** restart `dsh web` once → pick **DeepSeek + Vision** on the Models
@@ -139,8 +141,11 @@ Select the **DeepSeek + Vision** provider in the chat:
 | ![DeepSeek + Vision provider in the model picker](./docs/images/provider-picker.png) | ![Pasting an image into the chat — it is described before DeepSeek sees it](./docs/images/chat.png) |
 | :---: | :---: |
 
-- **paste / drop an image** → the configured VL model describes it first (verbatim code,
-  errors, logs, UI text, plus layout);
+- **paste / drop an image** → routed by the selected model: models the DeepSeek catalog
+  declares image-capable (the official default advertises `deepseek-v4-flash-vision-exp`)
+  keep the image and stream natively to DeepSeek's vision endpoint; text-only and
+  uncatalogued models get the configured VL description first (verbatim code, errors,
+  logs, UI text, plus layout);
 - the description replaces the image for DeepSeek → you keep coding with DeepSeek while
   gaining image understanding;
 - each image is described once and the result is reused across retries and turns;
@@ -152,7 +157,9 @@ Select the **DeepSeek + Vision** provider in the chat:
 flowchart LR
     User["chat paste / read_image / screenshot / MCP / ACP"] --> Gate["deepseek-vision route: inputModalities = text + image"]
     Gate --> Persist["apiproxy prompt RPC -> ImageBlock persisted to session log"]
-    Persist --> Bridge["ImageBridge rewrites image blocks (incl. nested tool results)"]
+    Persist --> Decide{"DeepSeek catalog declares image input for this model?"}
+    Decide -- "yes (official vision model)" --> Native["yield* super.stream(): parent serializes images natively to DeepSeek's vision endpoint"]
+    Decide -- "no (text-only / uncatalogued)" --> Bridge["ImageBridge rewrites image blocks (incl. nested tool results)"]
     VL["configured VL model (default qwen3-vl-flash, OpenAI-compatible endpoint)"] --> Bridge
     Cache["attachmentId -> description LRU cache"] --> Bridge
     Bridge --> Stream["yield* super.stream(): native DeepSeek wire keeps streaming"]
@@ -160,11 +167,14 @@ flowchart LR
 
 Why a gateway adapter instead of middleware: DSH has two hard gates — the `prompt` /
 `selectModel` RPC rejects models whose `inputModalities` lacks `image`, and the
-llm-deepseek serializer throws `UNSUPPORTED_CONTENT` on image blocks. This plugin
-registers a new provider route that extends the officially exported `DeepSeekAdapter`,
-rewrites image blocks to text inside `stream()`, then delegates to the pristine DeepSeek
-wire; reasoning efforts, context window, default maxTokens, and retry policy are
-inherited from the parent.
+llm-deepseek serializer throws `UNSUPPORTED_CONTENT` on image blocks for text-only
+models. This plugin registers a new provider route that extends the officially exported
+`DeepSeekAdapter`: inside `stream()` it first consults the **parent catalog** for the
+selected model — catalog-declared image models (official rc.2 publishes
+`deepseek-v4-flash-vision-exp` by default) pass through untouched and the parent
+serializes images natively; text-only and uncatalogued models get their image blocks
+rewritten to text before the pristine DeepSeek wire. Reasoning efforts, context window,
+default maxTokens, and retry policy are inherited from the parent.
 
 ## Configuration
 
@@ -241,7 +251,7 @@ recommendation:
 
 ```sh
 dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git (recommended), pinned commit
-dsh plugin --profile web add dsh-deepseek-vision                          # npm (published 0.1.5)
+dsh plugin --profile web add dsh-deepseek-vision                          # npm (published 0.1.7)
 dsh plugin --profile web add file:<repo path>                        # local directory (dev)
 dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
 ```
@@ -323,9 +333,11 @@ Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Contributing:
 
 ## Boundaries & Notes
 
-- **compaction**: inherits the session provider (the gateway route) by default — images
-  are rewritten and hit the cache; explicitly pinning compaction to `deepseek-official`
-  with images in history fails with `UNSUPPORTED_CONTENT` as before.
+- **compaction**: inherits the session provider (the gateway route) by default and
+  follows the session model — catalog-declared image models stream images natively,
+  text-only models get images rewritten and hit the cache; explicitly pinning compaction
+  to `deepseek-official` with images in history fails with `UNSUPPORTED_CONTENT` as
+  before.
 - **image-history sessions after uninstall**: after the plugin is removed, a session whose
   history contains images cannot switch back to a text-only model (the official
   `selectModel` gate rejects by `inputModalities` — expected behavior, not data loss);
@@ -363,7 +375,9 @@ both profiles; the settings card is web-only, and headless configures via `setti
 official `selectModel` gate rejects text-only models for image-bearing sessions. New
 sessions are unaffected; reinstalling restores the gateway route.
 
-**Why not send the image to DeepSeek directly?** DeepSeek's text-only models reject
+**Why not send the image to DeepSeek directly?** There are now two paths: models the
+DeepSeek catalog declares image-capable (official `deepseek-v4-flash-vision-exp`) already
+stream images natively and never touch this plugin. DeepSeek's text-only models reject
 `image_url`, so a VL model describes the image first — no model swap, no
 information loss.
 

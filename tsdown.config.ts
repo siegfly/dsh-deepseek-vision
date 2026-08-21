@@ -15,7 +15,7 @@ import { defineConfig } from 'tsdown'
 
 const ID = 'dsh-deepseek-vision'
 
-/** Client platform modules (mirror of the official PLATFORM_MODULES + store exemption). */
+/** Client platform modules (mirror of the official PLATFORM_MODULES + PRELOADED_CLIENT_EXTERNALS). */
 const EXTERNALS = [
   'react',
   'react/jsx-runtime',
@@ -23,10 +23,7 @@ const EXTERNALS = [
   'react-dom/client',
   '@deepseek-ai/cordis',
   '@deepseek-ai/dsh-client-ui-slots',
-  '@deepseek-ai/dsh-client-web-react',
   '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-ui-attachment',
-  '@deepseek-ai/dsh-client-schema-form',
   '@deepseek-ai/dsh-client-runtime/client',
 ]
 

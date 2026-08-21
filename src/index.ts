@@ -263,7 +263,15 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   const adapter = new VisionGatewayAdapter(
-    { options: connectionOptions, resolveApiKey, resolveUserId },
+    {
+      options: connectionOptions,
+      resolveApiKey,
+      resolveUserId,
+      // The native passthrough needs the durable store: the parent adapter
+      // resolves images through it before serializing. The plugin injects
+      // `attachments`, so the store is always present on this route.
+      resolveAttachments: () => ctx.attachments,
+    },
     bridge,
     currentDisplayName,
   )

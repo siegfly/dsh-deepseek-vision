@@ -78,9 +78,10 @@ export function apply(ctx: ClientContext): void {
   // The credential the card reports is not part of any settings section, so
   // its scope publishes nothing when one is written elsewhere. This forwarded
   // event is the only signal that a key written on another surface reached
-  // the Host.
+  // the Host. (dsh 0.1.1-rc.1 renamed the forwarded event from
+  // `credentials/updated` to `credentials/reference-updated`.)
   ctx.effect(
-    () => ctx.remote.$on('credentials/updated', (ref) => { controller.refreshCredential(ref) }),
+    () => ctx.remote.$on('credentials/reference-updated', (ref) => { controller.refreshCredential(ref) }),
     'vl-gateway: credential invalidations',
   )
 

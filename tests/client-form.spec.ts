@@ -251,8 +251,8 @@ describe.skipIf(!nodeClientRuntimeAvailable())('VlGatewayCardController', () => 
     await vi.waitFor(() => {
       expect(credentialsSet).toHaveBeenCalledWith({ ref: 'MY_VL_KEY', value: 'sk-secret' })
     })
-    // The Host now holds the key and forwards credentials/updated; the card
-    // re-reads through the same path the plugin's event subscription uses.
+    // The Host now holds the key and forwards credentials/reference-updated;
+    // the card re-reads through the same path the plugin's event subscription uses.
     credentialsDescribe.mockResolvedValue({
       result: { ok: true, value: { credentials: { MY_VL_KEY: { configured: true, writable: true } } } },
     })

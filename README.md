@@ -1,8 +1,8 @@
 # dsh-deepseek-vision
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
-[![](https://img.shields.io/badge/release-v0.1.5-5B4CF0?style=flat-square)](./CHANGELOG.md)
-[![](https://img.shields.io/badge/verified-102%20tests-2EA44F?style=flat-square)](./tests)
+[![](https://img.shields.io/badge/release-v0.1.7-5B4CF0?style=flat-square)](./CHANGELOG.md)
+[![](https://img.shields.io/badge/verified-111%20tests-2EA44F?style=flat-square)](./tests)
 [![](https://img.shields.io/badge/coverage-97%25-brightgreen?style=flat-square)](./vitest.config.ts)
 [![](https://img.shields.io/badge/license-MIT-0B7285?style=flat-square)](./LICENSE)
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
@@ -11,9 +11,11 @@
 **安装：** `dsh plugin --profile web add dsh-deepseek-vision`
 
 **dsh-deepseek-vision 是给 DeepSeek Harness 的视觉语言网关插件。** 纯文本的 DeepSeek 编程模型
-通过一个"网关"provider 路由获得贴图能力：图片先由可配置的视觉模型（默认 Qwen-VL）
-逐字描述成文字，再交给 DeepSeek 继续写代码。官方仓库零改动、跨机器安装不锁官方版本。
-同类方案里它是**最薄的桥**：不注入 agent 工具、不经过第三方中转、不依赖本地模型。
+通过一个"网关"provider 路由获得贴图能力：目录声明支持 image 的模型（官方
+`deepseek-v4-flash-vision-exp`）图片直通原生视觉端点；其余模型先由可配置的视觉模型
+（默认 Qwen-VL）逐字描述成文字，再交给 DeepSeek 继续写代码。官方仓库零改动、跨机器
+安装不锁官方版本。同类方案里它是**最薄的桥**：不注入 agent 工具、不经过第三方中转、
+不依赖本地模型。
 
 [English](README.en.md) | [中文](README.md)
 
@@ -64,7 +66,7 @@ dsh 视觉插件生态在官方 harness 发布后的几十小时内密集涌现�
   只经过**你自己配置的 VL 端点**（你的 key、你的端点、你的数据）；
 - **不依赖本地模型**：无 Python / MLX / llama.cpp / Ollama 要求，装上即用；
 - **与官方插件同一发布质量**：官方 bundle 机制安装、装前兼容门禁、构建锚点章、
-  102 个测试 / 97% 覆盖率、双语文档。
+  111 个测试 / 97% 覆盖率、双语文档。
 
 | 维度 | 本插件 | 工具型（如 [dsh-vision-any](https://github.com/tianmingwan/dsh-vision-any)、[dsh-vision](https://github.com/linenxi-ctrl/dsh-vision)） | 路由型（如 [dsh-vision-router](https://github.com/ysr666/dsh-vision-router)） | 代理型（如 [dsh-vision-proxy](https://github.com/Flyvhidbwo/dsh-vision-proxy)） | 本地管线型（如 [DeepSeek-Harness-Vision-Tools](https://github.com/tonyd2wild/DeepSeek-Harness-Vision-Tools)） |
 | --- | --- | --- | --- | --- | --- |
@@ -101,7 +103,7 @@ dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 npx @deepseek-ai/dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 ```
 
-已发布的 npm 版（0.1.5）同样可用：把 spec 换成 `dsh-deepseek-vision` 即可。
+已发布的 npm 版（0.1.7）同样可用：把 spec 换成 `dsh-deepseek-vision` 即可。
 
 **部署使用：** 重启一次 `dsh web` → Models 页选 **DeepSeek + Vision** → 设置 → 插件 →
 插件配置里填 VL 密钥 → 聊天窗贴图，发消息。
@@ -121,8 +123,10 @@ headless profile、其他 spec 形式（git / 目录 / tarball）、无 CLI 的�
 | ![模型选择器里的 DeepSeek + Vision provider](./docs/images/provider-picker.png) | ![聊天窗贴图，图片被描述后发送给 DeepSeek](./docs/images/chat.png) |
 | :---: | :---: |
 
-- **粘贴 / 拖入图片** → 被配置好的视觉模型先描述成文字（逐字提取代码、报错、日志、
-  UI 文案，并描述布局）；
+- **粘贴 / 拖入图片** → 按所选模型分流：目录声明支持 image 的模型（官方默认目录里的
+  `deepseek-v4-flash-vision-exp`）**图片直通原生**，直接走 DeepSeek 官方视觉端点；
+  纯文本 / 未列目录的模型则由配置好的视觉模型先描述成文字（逐字提取代码、报错、
+  日志、UI 文案，并描述布局）；
 - 描述文字替代图片发给 DeepSeek → 你继续用 DeepSeek 写代码，同时获得图片理解能力；
 - 每张图片只描述一次，重试 / 压缩 / 后续轮次都复用同一份描述，不重复计费；
 - session 日志仍然持久化原始图片，历史 / 回放 / 重构不变量不受影响。
@@ -133,7 +137,9 @@ headless profile、其他 spec 形式（git / 目录 / tarball）、无 CLI 的�
 flowchart LR
     User["聊天窗贴图 / read_image / 截图 / MCP / ACP"] --> Gate["deepseek-vision 路由：inputModalities = text + image"]
     Gate --> Persist["apiproxy prompt RPC → ImageBlock 持久化进 session log"]
-    Persist --> Bridge["ImageBridge：改写图片块（含 tool-result 嵌套）"]
+    Persist --> Decide{"DeepSeek 目录声明该模型支持 image？"}
+    Decide -- "是（官方视觉模型）" --> Native["yield* super.stream()：父类原生序列化图片，直通 DeepSeek 视觉端点"]
+    Decide -- "否（纯文本 / 未列目录）" --> Bridge["ImageBridge：改写图片块（含 tool-result 嵌套）"]
     VL["可配置 VL 模型（默认 qwen3-vl-flash，OpenAI 兼容端点）"] --> Bridge
     Cache["attachmentId → 描述 LRU 缓存"] --> Bridge
     Bridge --> Stream["yield* super.stream()：原生 DeepSeek wire 继续流式"]
@@ -141,10 +147,12 @@ flowchart LR
 
 为什么是"网关适配器"而不是中间件：DSH 有两道硬门槛——`prompt` / `selectModel` RPC 按
 `inputModalities` 拒绝不含 `image` 的模型（纯 `llm/stream` 中间件拦不到），llm-deepseek
-序列化器对 image block 抛 `UNSUPPORTED_CONTENT`。本插件注册新的 provider 路由，继承官方
-导出的 `DeepSeekAdapter`，`stream()` 里把图片块经 VL 模型改写为文本后再走原汁原味的
-DeepSeek wire；reasoning efforts / context 窗口 / 默认 maxTokens / retry policy 全部从
-父类继承。
+序列化器对 text-only 模型的 image block 抛 `UNSUPPORTED_CONTENT`。本插件注册新的
+provider 路由，继承官方导出的 `DeepSeekAdapter`：`stream()` 先按**父类目录**判断所选
+模型——目录声明 image 能力的（官方 rc.2 默认发布 `deepseek-v4-flash-vision-exp`）原样
+直通，由父类原生序列化图片；纯文本与未列目录的模型才把图片块经 VL 模型改写为文本，
+再走原汁原味的 DeepSeek wire。reasoning efforts / context 窗口 / 默认 maxTokens /
+retry policy 全部从父类继承。
 
 ## 配置
 
@@ -213,7 +221,7 @@ manifest 的 `dsh.profile.bundles` 层栈，loader 启动时按层挂载——**
 
 ```sh
 dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git（推荐），锁 commit
-dsh plugin --profile web add dsh-deepseek-vision                          # npm（已发布 0.1.5）
+dsh plugin --profile web add dsh-deepseek-vision                          # npm（已发布 0.1.7）
 dsh plugin --profile web add file:<本仓库路径>                        # 本地目录（开发）
 dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
 ```
@@ -291,7 +299,8 @@ pnpm build     # tsc（宿主面 + 客户端面）+ tsdown 浏览器 bundle
 
 ## 边界与注意
 
-- **compaction**：默认继承会话 provider（即网关路由），图片被改写且命中缓存；若把压缩
+- **compaction**：默认继承会话 provider（即网关路由），按会话模型分流——目录声明
+  image 的模型（官方视觉模型）图片直通原生；文本模型图片被改写且命中缓存。若把压缩
   策略显式 pin 到 `deepseek-official` 且历史含图，会按原逻辑 `UNSUPPORTED_CONTENT` 失败。
 - **卸载后的含图会话**：卸载插件后，含图历史会话无法切回文本模型（官方 `selectModel`
   按 `inputModalities` 准入拒绝，属预期行为，不是数据损坏）；新会话不受影响，重装即恢复。
@@ -324,8 +333,9 @@ dsh-deepseek-vision`——插件本身装在 profile 里，与 CLI 从哪来无�
 **卸载后，含图历史会话选不了模型？** 属预期行为：官方 `selectModel` 按
 `inputModalities` 拒绝文本模型接入含图会话。新会话不受影响，重装即恢复。
 
-**为什么图片不直接发给 DeepSeek？** 官方 DeepSeek 接口对纯文本模型会拒绝
-`image_url`，所以先由 VL 模型描述成文字再转发——不换模型、不丢信息。
+**为什么图片不直接发给 DeepSeek？** 现在有两种路径：DeepSeek 目录声明支持 image 的
+模型（官方 `deepseek-v4-flash-vision-exp`）图片**已经**直通原生、不走插件。其余纯文本
+模型官方接口会拒绝 `image_url`，所以先由 VL 模型描述成文字再转发——不换模型、不丢信息。
 
 ## 许可
 

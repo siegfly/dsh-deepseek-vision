@@ -62,6 +62,52 @@ async function drain(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[]>
   return chunks
 }
 
+/**
+ * A DeepSeek mock that streams a real SSE success. dsh 0.1.1-rc.2: the native
+ * image serialization first uploads to the Files API (`POST /files`,
+ * multipart) and falls back to inline base64 when that leg is refused, so the
+ * mock answers 500 to every non-chat request and tolerates non-JSON upload
+ * bodies.
+ */
+async function withStreamingDeepSeekServer(
+  run: (captured: { body: unknown; calls: number }, port: number) => Promise<void>,
+): Promise<void> {
+  const captured: { body: unknown; calls: number } = { body: undefined, calls: 0 }
+  const server: Server = createServer((req, res) => {
+    captured.calls += 1
+    const chunks: Buffer[] = []
+    req.on('data', (chunk: Buffer) => chunks.push(chunk))
+    req.on('end', () => {
+      try {
+        captured.body = chunks.length > 0 ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined
+      } catch {
+        captured.body = Buffer.concat(chunks).toString('utf8')
+      }
+      if (req.url !== '/chat/completions') {
+        res.writeHead(500, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ error: { message: 'files api unavailable' } }))
+        return
+      }
+      res.writeHead(200, { 'content-type': 'text/event-stream' })
+      res.write('data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n')
+      res.write('data: {"choices":[{"delta":{"content":" world"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2}}\n\n')
+      res.write('data: [DONE]\n\n')
+      res.end()
+    })
+  })
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => resolve())
+  })
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('no port')
+  try {
+    await run(captured, address.port)
+  } finally {
+    await new Promise<void>(resolve => server.close(() => resolve()))
+  }
+}
+
 interface Harness {
   ctx: Context
   dispose: () => Promise<void>
@@ -75,6 +121,20 @@ async function makeHarness(deepseekPort: number, vlPort: number, config: plugin.
     saveImage: async () => {
       throw new Error('not implemented')
     },
+    // dsh 0.1.1-rc.2: the parent's native image serialization resolves the
+    // request version through readImageRequest(ref, policy, signal).
+    readImageRequest: async (r: ImageAttachmentRef) => ({
+      variantId: `variant-${r.attachmentId}`,
+      attachment: r,
+      data: new Uint8Array([1, 2, 3]),
+      mediaType: r.mediaType,
+      bytes: r.bytes,
+      width: r.width,
+      height: r.height,
+      depth: 'uchar',
+      space: 'srgb',
+      hasAlpha: false,
+    }),
   } as unknown as AttachmentStore
   ctx.provide('attachments', attachments)
   const fiber = await ctx.plugin(Object.assign(
@@ -196,6 +256,45 @@ describe('llm-vl-gateway plugin', () => {
         )
       },
     )
+  })
+
+  it('keeps a catalog-declared image model native through the runtime dispatch (prepareCall claim)', async () => {
+    await withStreamingDeepSeekServer(async (deepseek, deepseekPort) => {
+      await withServer(
+        { status: 200, payload: { choices: [{ message: { content: 'must not run' } }] } },
+        async (vl, vlPort) => {
+          const harness = await makeHarness(deepseekPort, vlPort, {
+            deepseek: { baseURL: `http://127.0.0.1:${deepseekPort}` },
+            vl: { baseURL: `http://127.0.0.1:${vlPort}` },
+          })
+          try {
+            const chunks = await drain(harness.ctx.llm.stream({
+              provider: 'deepseek-vision',
+              model: 'deepseek-v4-flash-vision-exp',
+              messages: [{
+                role: 'user',
+                content: [{ type: 'image', attachment: REF }],
+                source: { kind: 'user' },
+              }],
+            }))
+            // dsh 0.1.1-rc.2 regression: the runtime dispatch (prepareCall →
+            // stream) must keep the route's image claim and reach the native
+            // wire — the request finishes and the VL leg never runs.
+            expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
+            expect(vl.calls).toBe(0)
+            // The parent's native serializer saw the image: data URL on the
+            // wire and no bridge stamp (the mock refuses the Files API leg,
+            // so the adapter falls back to inline base64).
+            const wire = JSON.stringify(deepseek.body)
+            expect(wire).toContain('image_url')
+            expect(wire).toContain('data:image/png;base64')
+            expect(wire).not.toContain('[Image:')
+          } finally {
+            await harness.dispose()
+          }
+        },
+      )
+    })
   })
 
   it('describes one unique image once across repeated requests (cache)', async () => {

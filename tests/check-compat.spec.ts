@@ -125,10 +125,10 @@ function writeCheckoutFixture(root: string, mutate?: (preset: string[], platform
   const replica = replicaValues()
   const externals = replica.externals
   if (externals === undefined) throw new Error('fixture: replica externals unreadable')
-  // officialExternals = PLATFORM_MODULES + RUNTIME_STORE_EXEMPTION, and the
-  // exemption is the replica list's last member by construction.
+  // officialExternals = PLATFORM_MODULES + PRELOADED_CLIENT_EXTERNALS, and the
+  // preload entry is the replica list's last member by construction.
   const platform = externals.slice(0, -1)
-  const exemption = externals.at(-1) ?? ''
+  const preloaded = externals.slice(-1)
   const preset: string[] = []
   const regex = (name: string, value: string | undefined) => {
     if (value === undefined) throw new Error(`fixture: replica ${name} unreadable`)
@@ -139,14 +139,15 @@ function writeCheckoutFixture(root: string, mutate?: (preset: string[], platform
   regex('INLINE_SAFE', replica.inlineSafe)
   preset.push(`const VENDORED_LIBRARY = /${replica.vendoredLibrary ?? ''}/`)
   preset.push(`const GENERATED_REMOTE = /${replica.generatedRemote ?? ''}/`)
-  preset.push(`const RUNTIME_STORE_EXEMPTION = '${exemption}'`)
   preset.push('banner: `window.__ModuleLoader__.load({ id: ${JSON.stringify(id)}, factory: (require) => {`,')
   preset.push("footer: 'return module.exports; } });',")
   preset.push("intro: 'var module = { exports: {} }; var exports = module.exports;',")
   mutate?.(preset, platform)
   const packages = join(root, 'packages', 'client')
   mkdirSync(join(packages, 'web', 'src'), { recursive: true })
-  writeFileSync(join(packages, 'web', 'src', 'platform.ts'), `export const PLATFORM_MODULES = ${JSON.stringify(platform)} as const\n`)
+  const platformSource = `export const PLATFORM_MODULES = ${JSON.stringify(platform)} as const\n`
+    + `export const PRELOADED_CLIENT_EXTERNALS = ${JSON.stringify(preloaded)} as const\n`
+  writeFileSync(join(packages, 'web', 'src', 'platform.ts'), platformSource)
   writeFileSync(join(packages, 'tsdown.client.ts'), preset.join('\n') + '\n')
 }
 
@@ -157,7 +158,7 @@ describe('client preset drift', () => {
     if (dir !== undefined) rmSync(dir, { recursive: true, force: true })
   })
 
-  it('parses the official externals from a checkout (platform modules + runtime exemption)', () => {
+  it('parses the official externals from a checkout (platform modules + preloaded externals)', () => {
     dir = mkdtempSync(join(tmpdir(), 'dsh-preset-'))
     writeCheckoutFixture(dir)
     const replica = replicaValues()

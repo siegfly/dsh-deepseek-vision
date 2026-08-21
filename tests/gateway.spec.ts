@@ -1,9 +1,11 @@
 /**
  * Adapter-level tests: the gateway claims image input, delegates catalog and
- * reasoning metadata to the DeepSeek parent, and rewrites images out of the
- * request before the text-only wire is called. The image-source tests cover
- * the shapes rc.7 bridges through the durable attachment store — ACP inline
- * images (top-level) and MCP tool-returned images (nested in tool results).
+ * reasoning metadata to the DeepSeek parent, passes catalog-declared
+ * image-capable models through to the parent's native image serialization,
+ * and rewrites images out of the request before the text-only wire for every
+ * other model. The image-source tests cover the shapes rc.7 bridges through
+ * the durable attachment store — ACP inline images (top-level) and MCP
+ * tool-returned images (nested in tool results).
  */
 
 import { createServer, type Server } from 'node:http'
@@ -11,7 +13,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { resolveAdapterOptions } from '@deepseek-ai/dsh-llm-deepseek'
 import type { ResolvedDeepSeekOptions } from '@deepseek-ai/dsh-llm-deepseek'
 import type { AnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
-import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type {
+  AttachmentStore,
+  ImageAttachmentRef,
+  ImageRequestPolicy,
+  ImageVariantId,
+} from '@deepseek-ai/dsh-attachment'
 import type { CallId, GenerateOptions, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { ImageBridge } from '../src/bridge.js'
 import { GATEWAY_INPUT_MODALITIES, VisionGatewayAdapter } from '../src/gateway.js'
@@ -60,6 +67,13 @@ async function withDeepSeekServer(run: (captured: Captured, port: number) => Pro
  * A DeepSeek mock that streams a real SSE success: two content deltas, a
  * finish_reason on the last, usage, and the `[DONE]` terminator — the exact
  * shape the official parser consumes (EOF without `[DONE]` is STREAM_CLOSED).
+ *
+ * dsh 0.1.1-rc.2 note: for a passthrough image request the parent adapter
+ * FIRST uploads the image to the Files API (`POST /files`, multipart — a
+ * deployment without that API gets `FileResolutionFailure` and falls back to
+ * inline base64), so the mock answers 500 to every non-chat request to force
+ * the deterministic base64 fallback the assertions below check, and tolerates
+ * non-JSON bodies on the upload leg.
  */
 async function withStreamingDeepSeekServer(run: (captured: Captured, port: number) => Promise<void>): Promise<void> {
   const captured: Captured = { body: undefined }
@@ -68,7 +82,18 @@ async function withStreamingDeepSeekServer(run: (captured: Captured, port: numbe
     const chunks: Buffer[] = []
     req.on('data', (chunk: Buffer) => chunks.push(chunk))
     req.on('end', () => {
-      captured.body = chunks.length > 0 ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined
+      try {
+        captured.body = chunks.length > 0 ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined
+      } catch {
+        captured.body = Buffer.concat(chunks).toString('utf8')
+      }
+      if (req.url !== '/chat/completions') {
+        // The Files API upload leg: refuse it so the adapter falls back to
+        // inline base64 (the native serialization under test).
+        res.writeHead(500, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ error: { message: 'files api unavailable' } }))
+        return
+      }
       res.writeHead(200, { 'content-type': 'text/event-stream' })
       res.write('data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n')
       res.write('data: {"choices":[{"delta":{"content":" world"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2}}\n\n')
@@ -106,6 +131,21 @@ function makeAdapter(
   })
   const attachments = {
     readImage: async (r: ImageAttachmentRef) => ({ ref: r, data: new Uint8Array([1]) }),
+    // dsh 0.1.1-rc.2: the parent's native serialization resolves the request
+    // version through readImageRequest(ref, policy, signal) — the store's new
+    // deterministic request-image projection seam.
+    readImageRequest: async (r: ImageAttachmentRef, _policy: ImageRequestPolicy) => ({
+      variantId: `variant-${r.attachmentId}` as ImageVariantId,
+      attachment: r,
+      data: new Uint8Array([1, 2, 3]),
+      mediaType: r.mediaType,
+      bytes: r.bytes,
+      width: r.width,
+      height: r.height,
+      depth: 'uchar',
+      space: 'srgb',
+      hasAlpha: false,
+    }),
   } as unknown as AttachmentStore
   const bridge = new ImageBridge({
     attachments,
@@ -119,6 +159,7 @@ function makeAdapter(
       options: () => connection,
       resolveApiKey: async () => 'deepseek-key',
       resolveUserId: () => 'tester' as AnonymousUserId,
+      resolveAttachments: () => attachments,
     },
     bridge,
     displayName,
@@ -193,6 +234,53 @@ describe('VisionGatewayAdapter', () => {
       expect(captured.url).toBe('/chat/completions')
       const wire = JSON.stringify(body)
       expect(wire).toContain('a wiring diagram')
+      expect(wire).not.toContain('image_url')
+      expect(wire).not.toContain('data:image')
+      expect(wire).not.toContain('"type":"image"')
+    })
+  })
+
+  it('passes a catalog-declared image model through with images intact, never calling the VL leg', async () => {
+    await withStreamingDeepSeekServer(async (captured, port) => {
+      const adapter = makeAdapter(port, async () => {
+        throw new Error('the vision-language leg must not run for a native image model')
+      })
+      const messages: Message[] = [{
+        role: 'user',
+        content: [{ type: 'text', text: 'what is this?' }, { type: 'image', attachment: REF }],
+        source: { kind: 'user' },
+      }]
+      const chunks = await drain(adapter.stream({
+        provider: 'deepseek-vision',
+        model: 'deepseek-v4-flash-vision-exp',
+        messages,
+      }))
+      expect(chunks.map(chunk => chunk.type)).toContain('finish')
+      // The parent's native serializer saw the image: data URL on the wire,
+      // and no bridge stamp anywhere.
+      const wire = JSON.stringify(captured.body)
+      expect(wire).toContain('image_url')
+      expect(wire).toContain('data:image/png;base64')
+      expect(wire).not.toContain('[Image:')
+    })
+  })
+
+  it('still bridges images for an uncatalogued (text-only) model id', async () => {
+    await withStreamingDeepSeekServer(async (captured, port) => {
+      const adapter = makeAdapter(port, async () => 'an uncatalogued description')
+      const messages: Message[] = [{
+        role: 'user',
+        content: [{ type: 'text', text: 'what is this?' }, { type: 'image', attachment: REF }],
+        source: { kind: 'user' },
+      }]
+      const chunks = await drain(adapter.stream({
+        provider: 'deepseek-vision',
+        model: 'some-deployment-only-model',
+        messages,
+      }))
+      expect(chunks.map(chunk => chunk.type)).toContain('finish')
+      const wire = JSON.stringify(captured.body)
+      expect(wire).toContain('an uncatalogued description')
       expect(wire).not.toContain('image_url')
       expect(wire).not.toContain('data:image')
       expect(wire).not.toContain('"type":"image"')

@@ -9,6 +9,66 @@ records the dsh version the committed `lib/` was built against — provenance, n
 install gate: every install rebuilds the plugin against the target machine's own dsh,
 so releases keep installing on newer (or older) official dsh.
 
+## 0.1.6
+
+- dsh 0.1.1-rc.1 anchor: the forwarded credential event was renamed upstream
+  (`credentials/updated` → `credentials/reference-updated`); the client card now
+  subscribes to the new name, so key writes on other surfaces refresh the card
+  again on rc.1 hosts.
+- Native vision passthrough: a model the DeepSeek catalog declares image-capable
+  (the official default now advertises `deepseek-v4-flash-vision-exp`) keeps its
+  images and streams through the parent adapter's native image serialization —
+  higher fidelity and no VL call. The description bridge still serves text-only
+  and uncatalogued models, which official dsh rejects for image input.
+- Client preset replica: the frozen EXTERNALS list now mirrors the official
+  `PLATFORM_MODULES` + `PRELOADED_CLIENT_EXTERNALS` (three specifiers the
+  official module table no longer answers were dropped), and the drift check
+  reads both arrays from `platform.ts` instead of the retired
+  `RUNTIME_STORE_EXEMPTION` constant — the externals comparison is checkable
+  again instead of silently unreadable.
+- Tests: passthrough coverage for catalog-declared image models and the
+  uncatalogued bridge fallback. (Prepared against dsh 0.1.1-rc.1; shipped as
+  part of 0.1.7, whose committed `lib/` is rebuilt against rc.2 — see below.)
+
+## 0.1.7
+
+- Re-anchored to dsh 0.1.1-rc.2: `dshCompat.anchorVersion` → `0.1.1-rc.2` and
+  the committed `lib/` rebuilt against the installed rc.2 types (`build-anchor`
+  stamp: `0.1.1-rc.2`, kind `installed` — the rc.1 source checkout on this
+  machine predates the rc.2 npm upgrade, so the installed profile fallback is
+  the build source). check-compat now grades the target an exact match again
+  (previously an advisory rc.1→rc.2 difference).
+- **rc.2 generation-binding fix**: `DeepSeekAdapter.prepareCall` changed BOTH
+  of its seams in 0.1.1-rc.2, and each silently broke the gateway route if
+  left inherited. It now (1) resolves the call generation through
+  `modelInfoFor()` directly instead of the virtual `resolveModel` — and the
+  llm runtime projects images to placeholder text for any call-prep result
+  whose `inputModalities` exclude image, so the route's image claim made in
+  `resolveModel`/`listModels` was bypassed and images never reached the
+  bridge; and (2) binds the dispatch to the parent's `streamWithConnection`
+  instead of the virtual `stream()`, so the bridge/passthrough decision never
+  ran and a text-only model's image died in the parent's
+  `UNSUPPORTED_CONTENT` admission gate. `VisionGatewayAdapter.prepareCall`
+  now re-asserts `GATEWAY_INPUT_MODALITIES` on the prepared model and rebinds
+  the virtual dispatch (the rc.1 base-class behavior the plugin was built
+  against): passthrough-vs-description still reads the parent catalog, and
+  live connection facts still reach the wire.
+- Native wire under rc.2: the parent's image serialization now resolves the
+  request version through the attachment store's new `readImageRequest(ref,
+  policy, signal)` seam (Files-API upload first, inline-base64 fallback); the
+  plugin injects the durable `ctx.attachments`, so passthrough works on rc.2
+  hosts unchanged. The official rc.2 catalog still advertises
+  `deepseek-v4-flash-vision-exp`, so the passthrough path is unchanged.
+- Tests: the runtime-level bridge tests (index/credentials) now pass against
+  rc.2's dispatch path, the adapter mocks implement the rc.2
+  `readImageRequest` shape, the streaming DeepSeek mock answers the Files-API
+  leg deterministically, and one new regression test streams a
+  catalog-declared image model through the RUNTIME dispatch to prove the
+  `prepareCall` claim reaches the native wire with the VL leg untouched
+  (111 tests: 99 passing + 12 designed skips).
+- Docs: README badges/version mentions and the Version-Alignment anchor text
+  follow the new release and anchor.
+
 ## 0.1.5
 
 - Credentials: align both gateway legs with the official rc.8 boundary. A mounted
