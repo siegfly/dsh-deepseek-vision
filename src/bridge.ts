@@ -107,10 +107,17 @@ export class ImageBridge {
   private assertWithinImageLimits(ref: ImageAttachmentRef): void {
     const limits = this.options.attachments.imageLimits
     if (limits === undefined) return
-    if (ref.bytes <= limits.maxImageBytes && ref.width * ref.height <= limits.maxImagePixels) return
+    // The per-side cap is an rc.8 addition; older dsh installs omit it, so the
+    // check degrades to bytes + pixels there.
+    const withinSide = limits.maxImageDimension === undefined
+      || (ref.width <= limits.maxImageDimension && ref.height <= limits.maxImageDimension)
+    if (ref.bytes <= limits.maxImageBytes && ref.width * ref.height <= limits.maxImagePixels && withinSide) return
+    const side = limits.maxImageDimension === undefined
+      ? 'unbounded'
+      : `${limits.maxImageDimension} px per side`
     throw new LlmError(
       `image ${String(ref.attachmentId)} exceeds the deployment image limits`
-      + ` (${ref.bytes} bytes, ${ref.width}x${ref.height} px; limits ${limits.maxImageBytes} bytes, ${limits.maxImagePixels} px)`,
+      + ` (${ref.bytes} bytes, ${ref.width}x${ref.height} px; limits ${limits.maxImageBytes} bytes, ${limits.maxImagePixels} px, ${side})`,
       'IMAGE_TOO_LARGE',
     )
   }

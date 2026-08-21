@@ -228,6 +228,54 @@ describe('ImageBridge.rewrite', () => {
     expect(reads).toBe(0)
   })
 
+  it('fails fast with IMAGE_TOO_LARGE when a side exceeds the deployment per-side limit', async () => {
+    let reads = 0
+    const bridge = makeBridge(async () => 'never', {
+      attachments: {
+        readImage: async () => {
+          reads += 1
+          throw new Error('must not be read')
+        },
+        imageLimits: {
+          maxImageBytes: 100_000,
+          maxImagesPerMessage: 1,
+          maxMessageImageBytes: 100_000,
+          maxImagePixels: 100_000,
+          maxImageDimension: 4,
+          mediaTypes: ['image/png'],
+        },
+      } as unknown as AttachmentStore,
+    })
+    // 100x2 stays inside the byte and pixel budgets; only the per-side cap trips.
+    const wide = ref('wide', { bytes: 4, width: 100, height: 2 })
+    await expect(bridge.rewrite(request([user([image(wide)])])))
+      .rejects.toMatchObject({ name: 'LlmError', failure: { code: 'IMAGE_TOO_LARGE' } })
+    expect(reads).toBe(0)
+  })
+
+  it('describes an image whose sides stay within the per-side limit', async () => {
+    const describe = vi.fn(async () => 'within')
+    const bridge = makeBridge(describe, {
+      attachments: {
+        readImage: async (r: ImageAttachmentRef) => ({ ref: r, data: new Uint8Array([9]) }),
+        imageLimits: {
+          maxImageBytes: 100_000,
+          maxImagesPerMessage: 1,
+          maxMessageImageBytes: 100_000,
+          maxImagePixels: 100_000,
+          maxImageDimension: 4,
+          mediaTypes: ['image/png'],
+        },
+      } as unknown as AttachmentStore,
+    })
+    const rewritten = await bridge.rewrite(request([user([image(ref('ok', { width: 4, height: 2 }))])]))
+    expect(describe).toHaveBeenCalledTimes(1)
+    expect(rewritten.messages[0]!.content[0]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('described by qwen-vl-max'),
+    })
+  })
+
   it('substitutes a placeholder for an oversized image under the placeholder policy', async () => {
     const bridge = makeBridge(async () => 'never', {
       onFailure: () => 'placeholder',
