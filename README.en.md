@@ -108,13 +108,16 @@ npx @deepseek-ai/dsh web               # no global install: CLI lives only in np
 > bare `dsh` fails with "command not found". Either install globally, or prefix
 > every command with `npx @deepseek-ai/dsh`.
 
-**Step 2 — install** (from npm — the recommended path):
+**Step 2 — install** (git form, pinned commit — recommended):
 
 ```sh
-dsh plugin --profile web add dsh-deepseek-vision
+dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 # without a global install, use the npx prefix:
-npx @deepseek-ai/dsh plugin --profile web add dsh-deepseek-vision
+npx @deepseek-ai/dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 ```
+
+The published npm version (0.1.5) works too — just swap the spec for
+`dsh-deepseek-vision`.
 
 **Deploy & use:** restart `dsh web` once → pick **DeepSeek + Vision** on the Models
 page → fill the VL key in **Settings → Plugins → Plugin settings** → paste an image
@@ -233,11 +236,12 @@ the package into the profile and reconciles the package name into the profile ma
 `dsh.profile.bundles` layer stack. **No manual `cordis.patch.yml` edits** (managed blocks
 from older versions are migrated away automatically on the next install/uninstall).
 
-Any of the official spec forms works — pick one:
+Any of the official spec forms works — the git form (pinned commit) is the everyday
+recommendation:
 
 ```sh
-dsh plugin --profile web add dsh-deepseek-vision                          # npm (recommended)
-dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git, pinned commit
+dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git (recommended), pinned commit
+dsh plugin --profile web add dsh-deepseek-vision                          # npm (published 0.1.5)
 dsh plugin --profile web add file:<repo path>                        # local directory (dev)
 dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
 ```
@@ -349,7 +353,8 @@ lives in the profile, independent of where the CLI comes from; one install is pe
 (`dsh plugin add`); only the no-CLI replica needs Node 22.19+ / 24+ and `pnpm` on PATH.
 
 **What does `#<sha>` mean?** A placeholder in the git spec form — replace it with a
-commit hash to pin an exact snapshot; everyday use just takes the npm form.
+commit hash to pin an exact snapshot; without `#<sha>` the install takes the latest
+commit of the default branch.
 
 **Does it support the CLI (headless)?** Yes. The gateway route behaves identically in
 both profiles; the settings card is web-only, and headless configures via `settings.yaml`.

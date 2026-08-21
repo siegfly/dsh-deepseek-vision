@@ -93,13 +93,15 @@ npx @deepseek-ai/dsh web               # 不装全局：CLI 只在 npx 缓存里
 > ⚠️ 用 `npx` 方式时 `dsh` **不会**进入 PATH——新开终端直接敲 `dsh` 会报
 > "command not found"。要么全局安装，要么所有命令都带 `npx @deepseek-ai/dsh` 前缀。
 
-**第二步：安装**（npm 发布版，推荐方式）：
+**第二步：安装**（git 形式，锁 commit，推荐）：
 
 ```sh
-dsh plugin --profile web add dsh-deepseek-vision
+dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 # 没装全局、走 npx 时：
-npx @deepseek-ai/dsh plugin --profile web add dsh-deepseek-vision
+npx @deepseek-ai/dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 ```
+
+已发布的 npm 版（0.1.5）同样可用：把 spec 换成 `dsh-deepseek-vision` 即可。
 
 **部署使用：** 重启一次 `dsh web` → Models 页选 **DeepSeek + Vision** → 设置 → 插件 →
 插件配置里填 VL 密钥 → 聊天窗贴图，发消息。
@@ -207,11 +209,11 @@ Agent 循环 / 网页搜索）同机制、同交互（暂存草稿、覆盖状�
 manifest 的 `dsh.profile.bundles` 层栈，loader 启动时按层挂载——**不需要手工往
 `cordis.patch.yml` 加任何行**（旧版本加过的受管块会在下次安装/卸载时自动迁移移除）。
 
-四种 spec 任选：
+四种 spec 任选（日常推荐 git 形式，锁 commit）：
 
 ```sh
-dsh plugin --profile web add dsh-deepseek-vision                          # npm（推荐）
-dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git，锁 commit
+dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git（推荐），锁 commit
+dsh plugin --profile web add dsh-deepseek-vision                          # npm（已发布 0.1.5）
 dsh plugin --profile web add file:<本仓库路径>                        # 本地目录（开发）
 dsh plugin --profile web add ./dsh-deepseek-vision-<version>.tgz              # tarball
 ```
@@ -314,7 +316,7 @@ dsh-deepseek-vision`——插件本身装在 profile 里，与 CLI 从哪来无�
 复刻脚本需要 Node 22.19+ / 24+ 和 PATH 里的 `pnpm`。
 
 **`#<sha>` 是什么？** git spec 形式的占位符——替换成具体 commit 哈希可锁死精确代码快照；
-日常使用走 npm 形式即可。
+不加 `#<sha>` 则安装默认分支最新提交。
 
 **支持 CLI（headless）吗？** 支持。网关路由在两个 profile 行为一致；设置卡片是 web
 专属，headless 用 `settings.yaml` 配置。
