@@ -103,7 +103,9 @@ dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 npx @deepseek-ai/dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 ```
 
-已发布的 npm 版（0.1.7）同样可用：把 spec 换成 `dsh-deepseek-vision` 即可。
+已发布的 npm 版（0.1.7）同样可用：把 spec 换成 `dsh-deepseek-vision@0.1.7`
+（显式锁版本——pnpm 11 默认对发布不足 24h 的新版本设年龄门槛，裸 spec 在
+0.1.7 发布 24h 内会暂时解析到旧版 0.1.5）。
 
 **部署使用：** 重启一次 `dsh web` → Models 页选 **DeepSeek + Vision** → 设置 → 插件 →
 插件配置里填 VL 密钥 → 聊天窗贴图，发消息。
@@ -221,7 +223,7 @@ manifest 的 `dsh.profile.bundles` 层栈，loader 启动时按层挂载——**
 
 ```sh
 dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git（推荐），锁 commit
-dsh plugin --profile web add dsh-deepseek-vision                          # npm（已发布 0.1.7）
+dsh plugin --profile web add dsh-deepseek-vision@0.1.7             # npm（已发布 0.1.7，显式锁版本）
 dsh plugin --profile web add file:<本仓库路径>                        # 本地目录（开发）
 dsh plugin --profile web add ./dsh-deepseek-vision-0.1.7.tgz              # tarball（npm pack 产物）
 ```

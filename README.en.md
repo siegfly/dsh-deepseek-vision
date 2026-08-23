@@ -118,8 +118,10 @@ dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 npx @deepseek-ai/dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>
 ```
 
-The published npm version (0.1.7) works too — just swap the spec for
-`dsh-deepseek-vision`.
+The published npm version (0.1.7) works too — swap the spec for
+`dsh-deepseek-vision@0.1.7` (explicit pin; pnpm 11 gates releases younger
+than 24h by default, so a bare spec would still resolve to 0.1.5 within
+the first day of a publish).
 
 **Deploy & use:** restart `dsh web` once → pick **DeepSeek + Vision** on the Models
 page → fill the VL key in **Settings → Plugins → Plugin settings** → paste an image
@@ -251,7 +253,7 @@ recommendation:
 
 ```sh
 dsh plugin --profile web add github:siegfly/dsh-deepseek-vision#<sha>       # git (recommended), pinned commit
-dsh plugin --profile web add dsh-deepseek-vision                          # npm (published 0.1.7)
+dsh plugin --profile web add dsh-deepseek-vision@0.1.7             # npm (published 0.1.7, explicit pin)
 dsh plugin --profile web add file:<repo path>                        # local directory (dev)
 dsh plugin --profile web add ./dsh-deepseek-vision-0.1.7.tgz              # tarball (npm pack artifact)
 ```
