@@ -47,9 +47,12 @@ jobs:
           if [ "$code" -gt 1 ]; then exit "$code"; fi
 
   # Foreign-machine path: no source checkout, only the npm-published dsh
-  # (pinned at 0.1.0-rc.6). Builds the fake healed fallback, then exercises
-  # the exact steps a user machine runs: install, build, test, check-compat
-  # (expected exit 1: target rc.6 vs anchor rc.7 = advisory), install-profile.
+  # (pinned at the 0.1.1-rc.2 anchor — the plugin's committed lib/ compiles
+  # against rc.2-only seams like readImageRequest/maxImageDimension, so older
+  # official versions would legitimately fail the build). Builds the fake healed
+  # fallback, then exercises the exact steps a user machine runs: install,
+  # build, test, check-compat (expected exit 0: target rc.2 vs anchor rc.2 =
+  # exact match), install-profile.
   installed-mode:
     strategy:
       fail-fast: false
@@ -67,7 +70,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Fake healed fallback from npm (dsh rc.6 tree)
+      - name: Fake healed fallback from npm (dsh 0.1.1-rc.2 tree)
         shell: bash
         run: |
           mkdir -p "$GITHUB_WORKSPACE/fake-home/profiles/web"
@@ -86,17 +89,17 @@ jobs:
           # pnpm exits non-zero with ERR_PNPM_IGNORED_BUILDS on dsh's native
           # toolchain deps even though the tree installs; assert on the tree
           # itself instead of the exit code.
-          pnpm add @deepseek-ai/dsh@0.1.0-rc.6 \
-            @deepseek-ai/dsh-llm@0.1.0-rc.6 @deepseek-ai/dsh-llm-deepseek@0.1.0-rc.6 \
-            @deepseek-ai/dsh-settings@0.1.0-rc.6 @deepseek-ai/dsh-attachment@0.1.0-rc.6 \
-            @deepseek-ai/dsh-api-remotes@0.1.0-rc.6 @deepseek-ai/dsh-credentials@0.1.0-rc.6 \
-            @deepseek-ai/dsh-credentials-local@0.1.0-rc.6 \
-            @deepseek-ai/dsh-anonymous-user-id@0.1.0-rc.6 @deepseek-ai/dsh-launch-environment@0.1.0-rc.6 \
-            @deepseek-ai/dsh-timeout@0.1.0-rc.6 @deepseek-ai/dsh-brand@0.1.0-rc.6 \
-            @deepseek-ai/dsh-home-paths@0.1.0-rc.6 @deepseek-ai/dsh-invariants@0.1.0-rc.6 \
-            @deepseek-ai/dsh-client-ui-slots@0.1.0-rc.6 @deepseek-ai/dsh-client-ui-settings-plugins@0.1.0-rc.6 \
-            @deepseek-ai/dsh-client-ui-settings@0.1.0-rc.6 @deepseek-ai/dsh-client-locale@0.1.0-rc.6 \
-            @deepseek-ai/dsh-client-connection@0.1.0-rc.6 @deepseek-ai/dsh-client-runtime@0.1.0-rc.6 \
+          pnpm add @deepseek-ai/dsh@0.1.1-rc.2 \
+            @deepseek-ai/dsh-llm@0.1.1-rc.2 @deepseek-ai/dsh-llm-deepseek@0.1.1-rc.2 \
+            @deepseek-ai/dsh-settings@0.1.1-rc.2 @deepseek-ai/dsh-attachment@0.1.1-rc.2 \
+            @deepseek-ai/dsh-api-remotes@0.1.1-rc.2 @deepseek-ai/dsh-credentials@0.1.1-rc.2 \
+            @deepseek-ai/dsh-credentials-local@0.1.1-rc.2 \
+            @deepseek-ai/dsh-anonymous-user-id@0.1.1-rc.2 @deepseek-ai/dsh-launch-environment@0.1.1-rc.2 \
+            @deepseek-ai/dsh-timeout@0.1.1-rc.2 @deepseek-ai/dsh-brand@0.1.1-rc.2 \
+            @deepseek-ai/dsh-home-paths@0.1.1-rc.2 @deepseek-ai/dsh-invariants@0.1.1-rc.2 \
+            @deepseek-ai/dsh-client-ui-slots@0.1.1-rc.2 @deepseek-ai/dsh-client-ui-settings-plugins@0.1.1-rc.2 \
+            @deepseek-ai/dsh-client-ui-settings@0.1.1-rc.2 @deepseek-ai/dsh-client-locale@0.1.1-rc.2 \
+            @deepseek-ai/dsh-client-connection@0.1.1-rc.2 @deepseek-ai/dsh-client-runtime@0.1.1-rc.2 \
             @deepseek-ai/cordis@4.0.1 @deepseek-ai/cosmokit@1.8.2 @deepseek-ai/schemastery@3.18.1 \
             react@18.2.0 || true
           test -f node_modules/@deepseek-ai/dsh/package.json
@@ -105,7 +108,7 @@ jobs:
       - run: pnpm build
       - name: Tests (client suites self-skip, npm ships the client runtime browser-only)
         run: pnpm test
-      - name: Compatibility check (target rc.6 vs anchor rc.7 = advisory exit 1)
+      - name: Compatibility check (target rc.2 vs anchor rc.2 = exact match exit 0)
         shell: bash
         run: |
           code=0

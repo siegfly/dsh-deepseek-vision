@@ -6,7 +6,7 @@
  */
 
 import { createServer, type Server } from 'node:http'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -241,6 +241,10 @@ describe('credentials seam', () => {
               const home = mkdtempSync(join(tmpdir(), 'dsh-creds-'))
               const path = join(home, '.credentials.yaml')
               writeFileSync(path, 'DEEPSEEK_API_KEY: sk-ds-gui-file\nQWEN_VL_API_KEY: sk-vl-gui-file\n')
+              // Official credentials-local refuses a world-readable file (owner-only,
+              // 0600). Default umask 022 would leave the temp file 0644 on POSIX CI
+              // runners (Linux/macOS); Windows has no owner-mode check.
+              if (process.platform !== 'win32') chmodSync(path, 0o600)
               try {
                 const harness = await makeHarness(deepseekPort, vlPort, { path })
                 try {
