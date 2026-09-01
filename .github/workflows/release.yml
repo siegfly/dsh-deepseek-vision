@@ -1,25 +1,17 @@
-name: release
-
-# Publishes a tagged release to npm (with provenance) and creates the GitHub
-# Release. Activate by: creating the GitHub repo, pushing the v* tag, and
-# adding an npm Automation access token as the NPM_TOKEN secret.
-#
-# The build runs in checkout-mode (official source checkout + drift check),
-# so the published lib/ is provably built against the anchor version the
-# tag declares.
+name: Publish GitHub release
 
 on:
   push:
-    tags: ['v*']
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
-    # The `runner` context is not accepted in job-level env; github.workspace is.
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     env:
       DSH_CHECKOUT: ${{ github.workspace }}/dsh
     steps:
@@ -29,31 +21,19 @@ jobs:
           version: 11.7.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-      - name: Clone official dsh checkout (shallow)
-        shell: bash
-        run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$GITHUB_WORKSPACE/dsh"
-      - name: Build the official checkout (a fresh clone ships no lib/types — the plugin compiles against them)
-        shell: bash
-        run: |
-          cd "$GITHUB_WORKSPACE/dsh"
-          pnpm install --frozen-lockfile
-          pnpm build
+          node-version: 24
+          cache: pnpm
+      - run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$DSH_CHECKOUT"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm test
-      - name: Compatibility check (refuse on stamp/preset integrity failures)
-        shell: bash
-        run: |
-          code=0
-          node scripts/check-compat.mjs || code=$?
-          if [ "$code" -gt 1 ]; then exit "$code"; fi
-      - name: Publish to npm (provenance)
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: GitHub Release
-        run: gh release create "$GITHUB_REF_NAME" --generate-notes
+        working-directory: ${{ env.DSH_CHECKOUT }}
+      - run: pnpm run build
+        working-directory: ${{ env.DSH_CHECKOUT }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: pnpm run test
+      - run: node scripts/check-compat.mjs
+      - run: pnpm pack --pack-destination dist
+      - run: sha256sum dist/*.tgz > dist/SHA256SUMS
+      - run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
