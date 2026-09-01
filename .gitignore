@@ -12,3 +12,4 @@ tsconfig.paths.json
 
 # Machine-local ops notes — never shipped or committed:
 docs/OPS.md
+dist/
