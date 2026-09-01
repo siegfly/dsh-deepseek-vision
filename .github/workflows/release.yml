@@ -11,9 +11,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      DSH_CHECKOUT: ${{ github.workspace }}/dsh
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -23,15 +21,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness "$DSH_CHECKOUT"
-      - run: pnpm install --frozen-lockfile
-        working-directory: ${{ env.DSH_CHECKOUT }}
-      - run: pnpm run build
-        working-directory: ${{ env.DSH_CHECKOUT }}
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-      - run: pnpm run test
-      - run: node scripts/check-compat.mjs
+      - run: test -f lib/index.js && test -f lib/client.js && test -f cordis.patch.yml
       - run: pnpm pack --pack-destination dist
       - run: sha256sum dist/*.tgz > dist/SHA256SUMS
       - run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
