@@ -11,8 +11,10 @@
  *
  * @module dsh-deepseek-vision/client/controller
  */
-import type { SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client';
-import { type CardActions, type CardApi, type CardFieldState, type CardShell } from './form.js';
+import type { Context as ClientContext } from '@deepseek-ai/cordis';
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
+import { type CardActions, type CardFieldState, type CardShell } from './form.js';
 /** Host settings namespace the gateway plugin owns. */
 export declare const GATEWAY_SETTINGS_NS = "llm-vl-gateway";
 /** Credential reference the gateway resolves when the section names none. */
@@ -57,15 +59,15 @@ export interface VlGatewayCardFace extends CardActions {
 /** Bridges the `llm-vl-gateway` scope and the credentials domain onto the card. */
 export declare class VlGatewayCardController {
     private readonly scope;
-    private readonly api;
+    private readonly ctx;
     private readonly form;
     private readonly store;
     private credential;
     /**
      * @param scope - the bound settings scope for the `llm-vl-gateway` namespace.
-     * @param api - wire face used for path-addressed settings writes and the credential.
+     * @param ctx - client context whose remote credentials namespace answers key state.
      */
-    constructor(scope: SettingsScope<VlGatewaySection>, api: CardApi);
+    constructor(scope: SettingsScope<VlGatewaySection>, ctx: ClientContext);
     private projection;
     /**
      * Ask the credentials domain about the reference the section currently

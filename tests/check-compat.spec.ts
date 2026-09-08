@@ -15,7 +15,7 @@ import {
 /** The declared anchor, so fallback-assessment fixtures track releases instead of hardcoding an rc. */
 const ANCHOR = (JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { dshCompat: { anchorVersion: string } }).dshCompat.anchorVersion
 /** One rc ahead of the anchor (its pre-release number + 1). */
-const AHEAD = ANCHOR.replace(/-rc\.(\d+)$/, (_, n: string) => `-rc.${Number(n) + 1}`)
+const AHEAD = ANCHOR.replace(/-(rc|alpha)\.(\d+)$/, (_, channel: string, n: string) => `-${channel}.${Number(n) + 1}`)
 
 /** Write one fixture package manifest into a fake fallback directory. */
 function writeFixture(root: string, pkg: string, version: string): void {
@@ -162,7 +162,7 @@ describe('client preset drift', () => {
     dir = mkdtempSync(join(tmpdir(), 'dsh-preset-'))
     writeCheckoutFixture(dir)
     const replica = replicaValues()
-    expect(replica.externals?.at(-1)).toBe('@deepseek-ai/dsh-client-runtime/client')
+    expect(replica.externals).toContain('@deepseek-ai/dsh-client-store')
     expect(officialExternals(dir)).toEqual(replica.externals)
   })
 

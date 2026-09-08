@@ -17,6 +17,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
 import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import {
@@ -27,7 +28,7 @@ import type {
   Config as DeepSeekSection,
   ResolvedDeepSeekOptions,
 } from '@deepseek-ai/dsh-llm-deepseek'
-import { deepEqualJson, installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { getOrCreateAnonymousUserId, type AnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
@@ -47,7 +48,7 @@ export type { VlFailurePolicy, ImageBridgeOptions } from './bridge.js'
 export { describeImage } from './vl.js'
 export type { VlConnectionFacts, VlDescribeInput } from './vl.js'
 
-const NS = settingsNamespace('llm-vl-gateway')
+const NS = 'llm-vl-gateway'
 
 /** The provider route this plugin owns (avoid `deepseek-official`, which llm-deepseek owns). */
 export const DEFAULT_PROVIDER = 'deepseek-vision'
@@ -271,6 +272,11 @@ export function apply(ctx: Context, config: Config): void {
       // resolves images through it before serializing. The plugin injects
       // `attachments`, so the store is always present on this route.
       resolveAttachments: () => ctx.attachments,
+      prepareExtensions: (request) => {
+        const extensions = ctx.get('deepseekLlmApiExtensions')
+        return extensions?.prepare(request)
+          ?? Promise.resolve({ fields: {}, accept: () => Promise.resolve() })
+      },
     },
     bridge,
     currentDisplayName,
@@ -336,20 +342,22 @@ export function apply(ctx: Context, config: Config): void {
     directoryFacts = entry
   }
 
-  installSettingsSection(ctx, NS, Config, config, {
-    setSource: (source) => {
-      current = source
-    },
-    onChange: () => {
-      // Named here rather than left to the settings watcher so a refusal
-      // reaches the operator as a specific diagnostic naming the plugin —
-      // and the previous route/directory keep serving either way.
-      try {
-        ensureRegistrationFacts()
-      } catch (error) {
-        ctx.logger.error('llm-vl-gateway: keeping the previously registered route and directory after a refused update')
-        ctx.logger.error(error)
-      }
-    },
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, NS, Config, config, {
+      setSource: (source) => {
+        current = source
+      },
+      onChange: () => {
+        // Named here rather than left to the settings watcher so a refusal
+        // reaches the operator as a specific diagnostic naming the plugin —
+        // and the previous route/directory keep serving either way.
+        try {
+          ensureRegistrationFacts()
+        } catch (error) {
+          ctx.logger.error('llm-vl-gateway: keeping the previously registered route and directory after a refused update')
+          ctx.logger.error(error)
+        }
+      },
+    })
   })
 }

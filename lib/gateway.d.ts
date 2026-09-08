@@ -18,15 +18,10 @@
  */
 import { DeepSeekAdapter } from '@deepseek-ai/dsh-llm-deepseek';
 import type { DeepSeekAdapterOptions } from '@deepseek-ai/dsh-llm-deepseek';
-import type { GenerateOptions, LlmModelInfo, LlmProviderInfo, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm';
+import type { GenerateOptions, LlmModelInfo, LlmProviderInfo, LlmResolvedModelInfo, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm';
 import type { ImageBridge } from './bridge.js';
 /** The gateway genuinely consumes images (via the VL leg), so the claim is real. */
 export declare const GATEWAY_INPUT_MODALITIES: readonly ["text", "image"];
-/** One generation: exact model metadata bound to its eventual stream call. */
-interface PreparedGatewayCall {
-    model: LlmResolvedModelInfo;
-    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;
-}
 /**
  * One gateway route: models the DeepSeek catalog declares image-capable stream
  * natively, while text-only models get every image described before dispatch.
@@ -52,31 +47,14 @@ export declare class VisionGatewayAdapter extends DeepSeekAdapter {
     listModels(provider: string): Promise<readonly LlmModelInfo[]>;
     resolveModel(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;
     /**
-     * One generation bound to its eventual stream call.
-     *
-     * dsh 0.1.1-rc.2 changed BOTH generation-binding seams of the parent's
-     * `prepareCall`, and each one would silently break this route if left
-     * inherited:
-     *
-     * 1. The parent's generation now resolves through `modelInfoFor()` directly
-     *    instead of the virtual `resolveModel` (the rc.1 base class called the
-     *    virtual), and the llm runtime projects images to placeholder text for
-     *    any call-prep result whose `inputModalities` exclude image — so a
-     *    claim made only in `resolveModel`/`listModels` would be bypassed and
-     *    this route's images would never reach the bridge.
-     * 2. The parent binds the dispatch to `streamWithConnection` directly
-     *    instead of the virtual `stream()`, so the bridge/passthrough decision
-     *    in this adapter's `stream()` would never run and a text-only model's
-     *    image would die in the parent's `UNSUPPORTED_CONTENT` admission gate.
-     *
-     * The parent's `prepareCall` (and its `PreparedAdapterCall` type) only
-     * exists on rc.2 hosts, so this override rebuilds the generation the way
-     * the rc.1 base `LlmAdapter.prepareCall` did — virtual `resolveModel` (the
-     * route's image claim) plus virtual `stream()` (the passthrough/bridge
-     * decision) — which is exactly the behavior this plugin was built against,
-     * and compiles against both rc.1 and rc.2 types.
+     * Bind the route claim and bridge decision to the parent's prepared dispatch.
+     * The parent captures its connection facts at preparation; re-entering
+     * `stream()` here would pair this generation's model metadata with a later
+     * settings generation.
      */
-    prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedGatewayCall>;
+    prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall>;
+    /** Rewrite one text-only prepared request before its captured parent dispatch. */
+    private streamRewritten;
     /**
      * Whether the underlying DeepSeek catalog declares native image input for
      * this model. Read from the PARENT resolver (not the claim override), so the
@@ -86,4 +64,3 @@ export declare class VisionGatewayAdapter extends DeepSeekAdapter {
     private acceptsImagesNatively;
     stream(options: GenerateOptions): AsyncIterable<StreamChunk>;
 }
-export {};

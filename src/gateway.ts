@@ -24,18 +24,13 @@ import type {
   LlmModelInfo,
   LlmProviderInfo,
   LlmResolvedModelInfo,
+  PreparedAdapterCall,
   StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { ImageBridge } from './bridge.js'
 
 /** The gateway genuinely consumes images (via the VL leg), so the claim is real. */
 export const GATEWAY_INPUT_MODALITIES = ['text', 'image'] as const
-
-/** One generation: exact model metadata bound to its eventual stream call. */
-interface PreparedGatewayCall {
-  model: LlmResolvedModelInfo
-  stream(options: GenerateOptions): AsyncIterable<StreamChunk>
-}
 
 /**
  * One gateway route: models the DeepSeek catalog declares image-capable stream
@@ -75,40 +70,32 @@ export class VisionGatewayAdapter extends DeepSeekAdapter {
   }
 
   /**
-   * One generation bound to its eventual stream call.
-   *
-   * dsh 0.1.1-rc.2 changed BOTH generation-binding seams of the parent's
-   * `prepareCall`, and each one would silently break this route if left
-   * inherited:
-   *
-   * 1. The parent's generation now resolves through `modelInfoFor()` directly
-   *    instead of the virtual `resolveModel` (the rc.1 base class called the
-   *    virtual), and the llm runtime projects images to placeholder text for
-   *    any call-prep result whose `inputModalities` exclude image — so a
-   *    claim made only in `resolveModel`/`listModels` would be bypassed and
-   *    this route's images would never reach the bridge.
-   * 2. The parent binds the dispatch to `streamWithConnection` directly
-   *    instead of the virtual `stream()`, so the bridge/passthrough decision
-   *    in this adapter's `stream()` would never run and a text-only model's
-   *    image would die in the parent's `UNSUPPORTED_CONTENT` admission gate.
-   *
-   * The parent's `prepareCall` (and its `PreparedAdapterCall` type) only
-   * exists on rc.2 hosts, so this override rebuilds the generation the way
-   * the rc.1 base `LlmAdapter.prepareCall` did — virtual `resolveModel` (the
-   * route's image claim) plus virtual `stream()` (the passthrough/bridge
-   * decision) — which is exactly the behavior this plugin was built against,
-   * and compiles against both rc.1 and rc.2 types.
+   * Bind the route claim and bridge decision to the parent's prepared dispatch.
+   * The parent captures its connection facts at preparation; re-entering
+   * `stream()` here would pair this generation's model metadata with a later
+   * settings generation.
    */
-  async prepareCall(
+  override async prepareCall(
     provider: string,
     model: string,
     signal?: AbortSignal,
-  ): Promise<PreparedGatewayCall> {
-    const info = await this.resolveModel(provider, model, signal)
+  ): Promise<PreparedAdapterCall> {
+    const prepared = await super.prepareCall(provider, model, signal)
+    const acceptsImages = prepared.model.inputModalities?.includes('image') === true
     return {
-      model: info,
-      stream: (options) => this.stream(options),
+      model: { ...prepared.model, inputModalities: GATEWAY_INPUT_MODALITIES },
+      stream: (options) => acceptsImages
+        ? prepared.stream(options)
+        : this.streamRewritten(prepared, options),
     }
+  }
+
+  /** Rewrite one text-only prepared request before its captured parent dispatch. */
+  private async *streamRewritten(
+    prepared: PreparedAdapterCall,
+    options: GenerateOptions,
+  ): AsyncIterable<StreamChunk> {
+    yield* prepared.stream(await this.bridge.rewrite(options))
   }
 
   /**

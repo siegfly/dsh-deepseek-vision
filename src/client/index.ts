@@ -12,20 +12,21 @@
  * @module dsh-deepseek-vision/client
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only Context merges: ctx.locale, ctx.remote, ctx.settingsScope.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: the `settings.plugin.item` SlotMap merge from the in-box contract.
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { VlGatewayCard } from './card.js'
 import { GATEWAY_SETTINGS_NS, VlGatewayCardController } from './controller.js'
 import { NS, en, zh } from './locales.js'
 
 /** Required services (cordis fiber inject). */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
+export const inject = ['slots', 'locale', 'remote', 'remote.credentials', 'settingsScope']
 
 const STYLES = `
 .vlgt-card { padding: 12px 16px 16px; border: 1px solid var(--dsh-border, rgba(128,128,128,.35)); border-radius: 8px; }
@@ -65,14 +66,13 @@ function injectStyles(): () => void {
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
-  const { api } = ctx.get('connection') as ConnectionHandle
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'vl-gateway: card dictionaries')
   const removeStyles = injectStyles()
   ctx.effect(() => removeStyles, 'vl-gateway: card styles')
 
   const controller = new VlGatewayCardController(
     ctx.settingsScope.bind({ namespace: 'llm-vl-gateway' }),
-    api,
+    ctx,
   )
 
   // The credential the card reports is not part of any settings section, so
@@ -85,18 +85,9 @@ export function apply(ctx: ClientContext): void {
     'vl-gateway: credential invalidations',
   )
 
-  // One registration carries BOTH slot shapes so the same built bundle installs
-  // on rc.6 and rc.7: rc.7 keyed `settings.plugin.item` by the settings
-  // namespace (`key`), while rc.6 declared it as a `list` (`id` + `order`).
-  // The loader validates only the field matching its declared kind and stores
-  // the rest, so a single entry satisfies either. Hoisted (not inlined) so the
-  // other version's fields are not fresh-literal excess-property errors.
-  // Retire `id`/`order` and re-inline once the rc.6 support line is dropped.
   const cardEntry = {
     name: 'settings.plugin.item',
     key: GATEWAY_SETTINGS_NS,
-    id: 'vl-gateway',
-    order: 30,
     locale: NS,
     inject: () => controller.inject(),
   } as const

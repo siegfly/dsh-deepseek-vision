@@ -222,7 +222,7 @@ describe('real dsh boot smoke', () => {
     expect(vl.requests).toHaveLength(0)
   }, 120_000)
 
-  it('boots the web profile with the plugin bundle mounted and serves the browser UI', async () => {
+  it('boots the web profile with the plugin bundle mounted and guards the browser UI', async () => {
     const webHome = mkdtempSync(join(tmpdir(), 'dsh-smoke-web-'))
     // Stage BEFORE launching: a missing manifest would make the launcher
     // auto-init the official template profile (without this plugin), which
@@ -239,7 +239,7 @@ describe('real dsh boot smoke', () => {
       // printing the URL.
       const url = await waitForWebUrl(launched.stdout, launched.stderr, 60_000)
       const response = await fetch(url)
-      expect(response.status).toBe(200)
+      expect(response.status).toBe(401)
     } finally {
       clearTimeout(killTimer)
       launched.child.kill('SIGKILL')
@@ -283,7 +283,7 @@ describe('real dsh boot smoke', () => {
       const killTimer = setTimeout(() => launched.child.kill('SIGKILL'), 90_000)
       try {
         const url = await waitForWebUrl(launched.stdout, launched.stderr, 60_000)
-        expect((await fetch(url)).status).toBe(200)
+        expect((await fetch(url)).status).toBe(401)
       } finally {
         clearTimeout(killTimer)
         launched.child.kill('SIGKILL')

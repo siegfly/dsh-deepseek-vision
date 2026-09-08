@@ -7,19 +7,16 @@
  * purity gate: cross-plugin value imports are forbidden), so the model lives
  * here with one adaptation: this card's fields live under the `vl` sub-section
  * of the `llm-vl-gateway` namespace, so writes are path-addressed through
- * `api.settings.mutate` (the client `SettingsScope.set` addresses only
- * root-level scalar fields).
+ * `SettingsScope.mutate` so each save preserves untouched and redacted
+ * values in the namespace section.
  *
  * @module dsh-deepseek-vision/client/form
  */
 
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import type {
-  SettingsScope,
-  SettingsScopeSnapshot,
-  SnapshotStore,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 // Type-only imports from the in-box card contract (erased before the client
 // purity gate runs): these four shapes are the drift-free official ones, so
 // they are shared rather than re-declared. `CardFieldSpec` stays local — this
@@ -32,9 +29,6 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 
 export type { CardActions, CardFieldState, CardSecretSpec, CardShell }
-
-/** Wire face the card writes through: path-addressed settings + credentials. */
-export type CardApi = Pick<ConnectionHandle['api'], 'credentials' | 'settings'>
 
 /** The write one field's staged text performs when the card is saved. */
 export type FieldWrite =
@@ -127,9 +121,9 @@ export function choiceField(
 
 /**
  * Stages one card's edits over one settings namespace and writes them on save.
- * Field writes are path-addressed `settings.mutate` ops against the namespace;
- * the Host response is authoritative — an accepted write clears its draft, a
- * refused one keeps it so the user can correct it.
+ * Field writes are path-addressed `SettingsScope.mutate` operations against
+ * the namespace; an accepted write clears its draft, while a rejected one
+ * keeps it so the user can correct it.
  */
 export class CardForm<T> {
   private readonly specs = new Map<string, CardFieldSpec>()
@@ -141,8 +135,6 @@ export class CardForm<T> {
 
   constructor(
     private readonly scope: SettingsScope<T>,
-    private readonly api: CardApi,
-    private readonly ns: string,
     specs: CardFieldSpec[],
     secrets: CardSecretSpec[] = [],
   ) {
@@ -213,10 +205,8 @@ export class CardForm<T> {
    *
    * Re-seed dependency: after the writes land, the controls re-read their
    * stored values when the Host forwards the `settings/document-updated`
-   * event through the scope subscription — the path-addressed
-   * `api.settings.mutate` below has no inline re-read like `SettingsScope.set`
-   * does. The forwarded event lands in the same Host settlement, so the
-   * re-seed is a same-tick refresh, not a poll.
+   * event through the scope subscription. The forwarded event lands in the
+   * same Host settlement, so the re-seed is a same-tick refresh, not a poll.
    */
   private async save(): Promise<void> {
     const plan = this.plan()
@@ -259,15 +249,11 @@ export class CardForm<T> {
     return plan
   }
 
-  /** Path-addressed set through the settings transport. */
+  /** Path-addressed set through the bound settings scope. */
   private async write(spec: CardFieldSpec, value: unknown): Promise<boolean> {
     try {
-      const response = await this.api.settings.mutate({
-        ns: this.ns,
-        ops: [{ op: 'set', path: [...spec.path], value }],
-        ...this.expectedRevision(),
-      })
-      return response.result.ok
+      await this.scope.mutate([{ op: 'set', path: [...spec.path], value: value as JsonValue }])
+      return true
     } catch {
       return false
     }
@@ -276,20 +262,11 @@ export class CardForm<T> {
   /** Path-addressed clear, so the field re-inherits the composition layer. */
   private async clear(spec: CardFieldSpec): Promise<boolean> {
     try {
-      const response = await this.api.settings.mutate({
-        ns: this.ns,
-        ops: [{ op: 'unset', path: [...spec.path] }],
-        ...this.expectedRevision(),
-      })
-      return response.result.ok
+      await this.scope.mutate([{ op: 'unset', path: [...spec.path] }])
+      return true
     } catch {
       return false
     }
-  }
-
-  private expectedRevision(): { expectedRevision: number } | Record<string, never> {
-    const revision = this.scope.getSnapshot().revision
-    return revision === undefined ? {} : { expectedRevision: revision }
   }
 
   private stage(field: string, edit: StagedEdit): void {

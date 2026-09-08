@@ -8,12 +8,12 @@
 
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import * as client from '../src/client/index.js'
 import { nodeClientRuntimeAvailable } from './support/client-runtime.js'
 
 interface RegisteredCard {
-  options: { name: string; key: string; id: string; order: number; locale: string }
+  options: { name: string; key: string; locale: string }
   component: (props: never) => unknown
   inject: () => unknown
 }
@@ -47,16 +47,12 @@ function mountClient(): Promise<{ cards: RegisteredCard[]; face: () => unknown }
     bind: () => (key: string) => key,
     register: () => () => {},
   })
-  ctx.provide('connection', {
-    api: {
-      settings: { mutate: async () => ({ result: { ok: true } }) },
-      credentials: {
-        describe: async () => ({ result: { ok: true, value: { credentials: {} } } }),
-        set: async () => ({ result: { ok: true } }),
-      },
-    },
-  })
-  ctx.provide('remote', { $on: () => () => {} })
+  const credentials = {
+    describe: async () => ({ ok: true, value: {} }),
+    set: async () => ({ ok: true }),
+  }
+  ctx.provide('remote', { $on: () => () => {}, credentials })
+  ctx.provide('remote.credentials', credentials)
   ctx.provide('settingsScope', { bind: () => scope })
   return ctx.plugin(Object.assign(
     (inner: Context) => client.apply(inner as never),
@@ -80,8 +76,6 @@ describe.skipIf(!nodeClientRuntimeAvailable())('client plugin half', () => {
     expect(cards[0]!.options).toMatchObject({
       name: 'settings.plugin.item',
       key: 'llm-vl-gateway',
-      id: 'vl-gateway',
-      order: 30,
       locale: 'vl-gateway',
     })
     expect(typeof cards[0]!.options.inject).toBe('function')
@@ -101,6 +95,6 @@ describe.skipIf(!nodeClientRuntimeAvailable())('client plugin half', () => {
   })
 
   it('declares the client services the card needs', () => {
-    expect(client.inject).toEqual(['slots', 'locale', 'connection', 'remote', 'settingsScope'])
+    expect(client.inject).toEqual(['slots', 'locale', 'remote', 'remote.credentials', 'settingsScope'])
   })
 })

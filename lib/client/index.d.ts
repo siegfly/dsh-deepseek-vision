@@ -11,7 +11,7 @@
  *
  * @module dsh-deepseek-vision/client
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
+import type { Context as ClientContext } from '@deepseek-ai/cordis';
 /** Required services (cordis fiber inject). */
 export declare const inject: string[];
 /**

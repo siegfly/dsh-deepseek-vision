@@ -160,6 +160,7 @@ function makeAdapter(
       resolveApiKey: async () => 'deepseek-key',
       resolveUserId: () => 'tester' as AnonymousUserId,
       resolveAttachments: () => attachments,
+      prepareExtensions: async () => ({ fields: {}, accept: async () => {} }),
     },
     bridge,
     displayName,

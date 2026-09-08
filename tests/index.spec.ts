@@ -11,7 +11,6 @@ import LlmRuntime from '@deepseek-ai/dsh-llm'
 import { LlmAdapter } from '@deepseek-ai/dsh-llm'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import * as plugin from '../src/index.js'
 import { MemorySettings } from './support/memory-settings.js'
 
@@ -389,13 +388,14 @@ describe('llm-vl-gateway plugin', () => {
         const watchers: (() => void)[] = []
         let section: Record<string, unknown> = {}
         const settings = {
-          register: () => ({
-            get: () => section,
-            watch: (notify: () => void) => {
-              watchers.push(notify)
-              return () => {}
-            },
-          }),
+          installSection: (_owner: Context, _ns: string, _schema: unknown, _entry: unknown, hooks: {
+            setSource: (source: () => Record<string, unknown>) => void
+            onChange: () => void
+          }) => {
+            hooks.setSource(() => section)
+            watchers.push(hooks.onChange)
+            hooks.onChange()
+          },
         }
         const ctx = new Context()
         await ctx.plugin(LlmRuntime)
@@ -481,7 +481,7 @@ describe('llm-vl-gateway plugin', () => {
           harness.ctx.llm.registerConfigurableProviders([{
             provider: 'taken',
             displayName: 'Taken',
-            settingsNs: settingsNamespace('foreign'),
+            settingsNs: 'foreign',
             settingsPath: ['x'],
           }])
           harness.settings.pushExternal({ 'llm-vl-gateway': { provider: 'taken', displayName: 'Taken' } })

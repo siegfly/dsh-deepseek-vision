@@ -5,9 +5,9 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context } from '@deepseek-ai/cordis'
+import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { CardForm, choiceField, numberField, textField } from '../src/client/form.js'
-import type { CardApi } from '../src/client/form.js'
 import { DEFAULT_VL_API_KEY_REF, VlGatewayCardController } from '../src/client/controller.js'
 import type { VlGatewaySection } from '../src/client/controller.js'
 import { nodeClientRuntimeAvailable } from './support/client-runtime.js'
@@ -36,6 +36,7 @@ function makeScope(initial: {
   status?: SettingsScopeSnapshot<Section>['status']
 }): {
   scope: SettingsScope<Section>
+  mutate: ReturnType<typeof vi.fn>
   publish: (next: Partial<SettingsScopeSnapshot<Section>>) => void
 } {
   let snapshot: SettingsScopeSnapshot<Section> = {
@@ -48,6 +49,7 @@ function makeScope(initial: {
     mode: 'host',
   }
   const listeners = new Set<() => void>()
+  const mutate = vi.fn(async () => {})
   const scope = {
     getSnapshot: () => snapshot,
     subscribe: (listener: () => void) => {
@@ -56,9 +58,11 @@ function makeScope(initial: {
     },
     set: async () => {},
     unset: async () => {},
+    mutate,
   } as SettingsScope<Section>
   return {
     scope,
+    mutate,
     publish: (next) => {
       snapshot = { ...snapshot, ...next }
       for (const listener of listeners) listener()
@@ -67,25 +71,16 @@ function makeScope(initial: {
 }
 
 function makeApi(): {
-  api: CardApi
-  mutate: ReturnType<typeof vi.fn>
+  ctx: Context
   credentialsDescribe: ReturnType<typeof vi.fn>
   credentialsSet: ReturnType<typeof vi.fn>
 } {
-  const mutate = vi.fn(async () => ({ result: { ok: true, value: {} } }))
-  const credentialsDescribe = vi.fn(async () => ({
-    result: { ok: true, value: { credentials: {} } },
-  }))
-  const credentialsSet = vi.fn(async () => ({ result: { ok: true } }))
+  const credentialsDescribe = vi.fn(async () => ({ ok: true, value: {} }))
+  const credentialsSet = vi.fn(async () => ({ ok: true }))
   return {
-    api: {
-      settings: { mutate },
-      credentials: {
-        describe: credentialsDescribe,
-        set: credentialsSet,
-      },
-    } as unknown as CardApi,
-    mutate,
+    ctx: {
+      remote: { credentials: { describe: credentialsDescribe, set: credentialsSet } },
+    } as unknown as Context,
     credentialsDescribe,
     credentialsSet,
   }
@@ -93,14 +88,10 @@ function makeApi(): {
 
 function makeForm(overrides: {
   scope?: SettingsScope<Section>
-  api?: CardApi
 } = {}) {
-  const { scope, publish } = makeScope({})
-  const { api, ...spies } = makeApi()
+  const { scope, publish, mutate } = makeScope({})
   const form = new CardForm<Section>(
     overrides.scope ?? scope,
-    overrides.api ?? api,
-    'llm-vl-gateway',
     [
       textField('baseURL', ['vl', 'baseURL']),
       textField('model', ['vl', 'model']),
@@ -108,7 +99,7 @@ function makeForm(overrides: {
       choiceField('onFailure', ['vl', 'onFailure'], ['fail', 'placeholder']),
     ],
   )
-  return { form, scope, publish, api, ...spies }
+  return { form, scope, publish, mutate }
 }
 
 // Skipped on npm-only machines: the official client runtime ships browser-only
@@ -132,18 +123,14 @@ describe.skipIf(!nodeClientRuntimeAvailable())('CardForm', () => {
     expect(form.shell()).toMatchObject({ dirty: true, invalid: false })
     form.actions().save()
     await vi.waitFor(() => {
-      expect(mutate).toHaveBeenCalledWith({
-        ns: 'llm-vl-gateway',
-        ops: [{ op: 'set', path: ['vl', 'baseURL'], value: 'https://openrouter.example/api/v1' }],
-        expectedRevision: 1,
-      })
+      expect(mutate).toHaveBeenCalledWith([
+        { op: 'set', path: ['vl', 'baseURL'], value: 'https://openrouter.example/api/v1' },
+      ])
     })
     await vi.waitFor(() => {
-      expect(mutate).toHaveBeenCalledWith({
-        ns: 'llm-vl-gateway',
-        ops: [{ op: 'set', path: ['vl', 'timeoutMs'], value: 90000 }],
-        expectedRevision: 1,
-      })
+      expect(mutate).toHaveBeenCalledWith([
+        { op: 'set', path: ['vl', 'timeoutMs'], value: 90000 },
+      ])
     })
   })
 
@@ -163,11 +150,9 @@ describe.skipIf(!nodeClientRuntimeAvailable())('CardForm', () => {
     form.actions().resetField('model')
     form.actions().save()
     await vi.waitFor(() => {
-      expect(mutate).toHaveBeenCalledWith({
-        ns: 'llm-vl-gateway',
-        ops: [{ op: 'unset', path: ['vl', 'model'] }],
-        expectedRevision: 1,
-      })
+      expect(mutate).toHaveBeenCalledWith([
+        { op: 'unset', path: ['vl', 'model'] },
+      ])
     })
   })
 
@@ -191,11 +176,10 @@ describe.skipIf(!nodeClientRuntimeAvailable())('CardForm', () => {
   it('reports a refused write as failed and keeps the draft', async () => {
     const { form, scope, publish } = makeForm()
     publish({ value: {}, user: {} })
-    const mutate = vi.fn(async () => ({ result: { ok: false } }))
+    const mutate = vi.fn(async () => { throw new Error('refused') })
+    const failingScope = { ...scope, mutate } as SettingsScope<Section>
     const failing = new CardForm<Section>(
-      scope,
-      { settings: { mutate }, credentials: {} } as unknown as CardApi,
-      'llm-vl-gateway',
+      failingScope,
       [textField('baseURL', ['vl', 'baseURL'])],
     )
     failing.actions().edit('baseURL', 'https://x')
@@ -210,8 +194,8 @@ describe.skipIf(!nodeClientRuntimeAvailable())('CardForm', () => {
 describe.skipIf(!nodeClientRuntimeAvailable())('VlGatewayCardController', () => {
   it('projects every vl field and the credential state into the card snapshot', async () => {
     const { scope, publish } = makeScope({})
-    const { api, credentialsDescribe, credentialsSet } = makeApi()
-    const controller = new VlGatewayCardController(scope, api)
+    const { ctx, credentialsDescribe, credentialsSet } = makeApi()
+    const controller = new VlGatewayCardController(scope, ctx)
     publish({
       value: { vl: { model: 'qwen-vl-max', timeoutMs: 60000, onFailure: 'placeholder' } },
       user: { vl: { timeoutMs: 60000 } },
@@ -228,34 +212,30 @@ describe.skipIf(!nodeClientRuntimeAvailable())('VlGatewayCardController', () => 
 
   it('describes the default credential reference when the section names none', async () => {
     const { scope } = makeScope({ value: {} })
-    const { api, credentialsDescribe } = makeApi()
-    new VlGatewayCardController(scope, api)
+    const { ctx, credentialsDescribe } = makeApi()
+    new VlGatewayCardController(scope, ctx)
     await vi.waitFor(() => {
-      expect(credentialsDescribe).toHaveBeenCalledWith({ refs: [DEFAULT_VL_API_KEY_REF] })
+      expect(credentialsDescribe).toHaveBeenCalledWith([DEFAULT_VL_API_KEY_REF])
     })
   })
 
   it('writes the staged key to the credentials domain and reflects the read-back', async () => {
     const { scope, publish } = makeScope({ value: { vl: { apiKeyEnv: 'MY_VL_KEY' } } })
-    const { api, credentialsDescribe, credentialsSet } = makeApi()
-    credentialsDescribe.mockResolvedValue({
-      result: { ok: true, value: { credentials: { MY_VL_KEY: { configured: false, writable: true } } } },
-    })
-    const controller = new VlGatewayCardController(scope, api)
+    const { ctx, credentialsDescribe, credentialsSet } = makeApi()
+    credentialsDescribe.mockResolvedValue({ ok: true, value: { MY_VL_KEY: { configured: false, writable: true } } })
+    const controller = new VlGatewayCardController(scope, ctx)
     await vi.waitFor(() => {
-      expect(credentialsDescribe).toHaveBeenCalledWith({ refs: ['MY_VL_KEY'] })
+      expect(credentialsDescribe).toHaveBeenCalledWith(['MY_VL_KEY'])
     })
     const face = controller.inject()
     face.edit('apiKey', 'sk-secret')
     face.save()
     await vi.waitFor(() => {
-      expect(credentialsSet).toHaveBeenCalledWith({ ref: 'MY_VL_KEY', value: 'sk-secret' })
+      expect(credentialsSet).toHaveBeenCalledWith('MY_VL_KEY', 'sk-secret')
     })
     // The Host now holds the key and forwards credentials/reference-updated;
     // the card re-reads through the same path the plugin's event subscription uses.
-    credentialsDescribe.mockResolvedValue({
-      result: { ok: true, value: { credentials: { MY_VL_KEY: { configured: true, writable: true } } } },
-    })
+    credentialsDescribe.mockResolvedValue({ ok: true, value: { MY_VL_KEY: { configured: true, writable: true } } })
     controller.refreshCredential('MY_VL_KEY')
     await vi.waitFor(() => {
       expect(face.hooks.vlGatewayCard.getSnapshot().apiKeyConfigured).toBe(true)

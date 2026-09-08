@@ -42,14 +42,16 @@ export const PACKAGE_NAMES = [
   '@deepseek-ai/dsh-llm-deepseek',
   '@deepseek-ai/dsh-settings',
   '@deepseek-ai/dsh-timeout',
+  '@deepseek-ai/dsh-util-values',
+  '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-slots',
+  '@deepseek-ai/dsh-client-ui-renderer/client',
   '@deepseek-ai/dsh-client-ui-settings-plugins',
   '@deepseek-ai/dsh-client-ui-settings-plugins/client',
   '@deepseek-ai/dsh-client-ui-settings/client',
   '@deepseek-ai/dsh-client-locale/client',
   '@deepseek-ai/dsh-api-remotes/client',
   '@deepseek-ai/dsh-client-connection/client',
-  '@deepseek-ai/dsh-client-runtime/client',
 ]
 
 /** Read the machine-local checkout override, if the user created one. */

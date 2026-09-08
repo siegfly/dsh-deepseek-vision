@@ -12,10 +12,13 @@
  * @module dsh-deepseek-vision/client/controller
  */
 
-import type { SettingsScope, SettingsScopeSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   CardForm, choiceField, numberField, textField,
-  type CardActions, type CardApi, type CardFieldState, type CardShell,
+  type CardActions, type CardFieldState, type CardShell,
 } from './form.js'
 
 /** Host settings namespace the gateway plugin owns. */
@@ -86,16 +89,14 @@ export class VlGatewayCardController {
 
   /**
    * @param scope - the bound settings scope for the `llm-vl-gateway` namespace.
-   * @param api - wire face used for path-addressed settings writes and the credential.
+   * @param ctx - client context whose remote credentials namespace answers key state.
    */
   constructor(
     private readonly scope: SettingsScope<VlGatewaySection>,
-    private readonly api: CardApi,
+    private readonly ctx: ClientContext,
   ) {
     this.form = new CardForm(
       scope,
-      api,
-      GATEWAY_SETTINGS_NS,
       [
         textField('apiKeyEnv', ['vl', 'apiKeyEnv']),
         textField('baseURL', ['vl', 'baseURL']),
@@ -140,9 +141,9 @@ export class VlGatewayCardController {
       this.store.set(this.projection())
     }
     try {
-      const response = await this.api.credentials.describe({ refs: [ref] })
-      if (!response.result.ok || ref !== refOf(this.scope.getSnapshot())) return
-      const view = response.result.value.credentials[ref]
+      const response = await this.ctx.remote.credentials.describe([ref])
+      if (!response.ok || ref !== refOf(this.scope.getSnapshot())) return
+      const view = response.value[ref]
       const next: CredentialState = {
         ref,
         configured: view?.configured ?? false,
@@ -170,7 +171,7 @@ export class VlGatewayCardController {
   /** Write the staged key, then re-read whether the Host now holds one. */
   private async writeKey(value: string): Promise<boolean> {
     try {
-      await this.api.credentials.set({ ref: refOf(this.scope.getSnapshot()), value })
+      await this.ctx.remote.credentials.set(refOf(this.scope.getSnapshot()), value)
     } catch {
       // Refusals surface through the re-read below.
     }

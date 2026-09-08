@@ -7,17 +7,15 @@
  * purity gate: cross-plugin value imports are forbidden), so the model lives
  * here with one adaptation: this card's fields live under the `vl` sub-section
  * of the `llm-vl-gateway` namespace, so writes are path-addressed through
- * `api.settings.mutate` (the client `SettingsScope.set` addresses only
- * root-level scalar fields).
+ * `SettingsScope.mutate` so each save preserves untouched and redacted
+ * values in the namespace section.
  *
  * @module dsh-deepseek-vision/client/form
  */
-import type { SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client';
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client';
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
 import type { CardActions, CardFieldState, CardSecretSpec, CardShell } from '@deepseek-ai/dsh-client-ui-settings-plugins/client';
 export type { CardActions, CardFieldState, CardSecretSpec, CardShell };
-/** Wire face the card writes through: path-addressed settings + credentials. */
-export type CardApi = Pick<ConnectionHandle['api'], 'credentials' | 'settings'>;
 /** The write one field's staged text performs when the card is saved. */
 export type FieldWrite = {
     kind: 'set';
@@ -44,21 +42,19 @@ export declare function numberField(field: string, path: readonly string[]): Car
 export declare function choiceField(field: string, path: readonly string[], choices: readonly string[]): CardFieldSpec;
 /**
  * Stages one card's edits over one settings namespace and writes them on save.
- * Field writes are path-addressed `settings.mutate` ops against the namespace;
- * the Host response is authoritative — an accepted write clears its draft, a
- * refused one keeps it so the user can correct it.
+ * Field writes are path-addressed `SettingsScope.mutate` operations against
+ * the namespace; an accepted write clears its draft, while a rejected one
+ * keeps it so the user can correct it.
  */
 export declare class CardForm<T> {
     private readonly scope;
-    private readonly api;
-    private readonly ns;
     private readonly specs;
     private readonly secretSpecs;
     private readonly staged;
     private readonly listeners;
     private saving;
     private failed;
-    constructor(scope: SettingsScope<T>, api: CardApi, ns: string, specs: CardFieldSpec[], secrets?: CardSecretSpec[]);
+    constructor(scope: SettingsScope<T>, specs: CardFieldSpec[], secrets?: CardSecretSpec[]);
     /** Publish a projection of this form, rebuilt whenever the scope or a draft changes. */
     bind<S>(project: () => S): SnapshotStore<S>;
     /** Read the card-level state: what the Host serves, and what a save would do. */
@@ -73,19 +69,16 @@ export declare class CardForm<T> {
      *
      * Re-seed dependency: after the writes land, the controls re-read their
      * stored values when the Host forwards the `settings/document-updated`
-     * event through the scope subscription — the path-addressed
-     * `api.settings.mutate` below has no inline re-read like `SettingsScope.set`
-     * does. The forwarded event lands in the same Host settlement, so the
-     * re-seed is a same-tick refresh, not a poll.
+     * event through the scope subscription. The forwarded event lands in the
+     * same Host settlement, so the re-seed is a same-tick refresh, not a poll.
      */
     private save;
     /** Every staged edit a save would write, in staging order. */
     private plan;
-    /** Path-addressed set through the settings transport. */
+    /** Path-addressed set through the bound settings scope. */
     private write;
     /** Path-addressed clear, so the field re-inherits the composition layer. */
     private clear;
-    private expectedRevision;
     private stage;
     private spec;
     private snapshotOf;

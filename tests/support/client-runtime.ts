@@ -18,7 +18,7 @@ import { harnessRoot, resolvePackageDir } from '../../scripts/harness-paths.mjs'
 export function nodeClientRuntimeAvailable(): boolean {
   const located = harnessRoot()
   if (located === undefined) return false
-  const dir = resolvePackageDir('@deepseek-ai/dsh-client-runtime/client')
+  const dir = resolvePackageDir('@deepseek-ai/dsh-client-ui-settings/client')
   if (dir === undefined) return false
   if (located.kind === 'checkout') {
     return existsSync(join(dir, 'src', 'client', 'index.ts'))
