@@ -211,6 +211,8 @@ process always wins and cannot be changed in the GUI:
 **Settings → Plugins → Plugin settings** card ("DeepSeek + Vision", all `vl.*` fields +
 VL key), the Web Models page (the `deepseek.*` subsection is rendered by the configurable
 provider directory), and `settings.yaml` (both subsections).
+The card is collapsed by default like native DSH plugin cards; collapsing retains drafts,
+and a successful save collapses it automatically.
 
 `provider` / `displayName` are registration-time facts: edits apply immediately (the
 adapter route and the configurable provider directory are re-registered atomically, no

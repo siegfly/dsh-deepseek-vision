@@ -12,6 +12,7 @@
  */
 
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { useEffect, useRef, useState } from 'react'
 // Type-only: the in-box client slot contract merges `settings.plugin.item` into SlotMap.
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import type { VlGatewayCardFace } from './controller.js'
@@ -98,14 +99,39 @@ function Field(props: {
 export function VlGatewayCard(props: VlGatewayCardProps) {
   const { t } = props
   const state = props.useVlGatewayCard(snapshot => snapshot)
+  const [open, setOpen] = useState(false)
+  const saveStarted = useRef(false)
+  useEffect(() => {
+    if (state.saving) {
+      saveStarted.current = true
+      return
+    }
+    if (!saveStarted.current) return
+    saveStarted.current = false
+    if (!state.dirty && !state.failed) setOpen(false)
+  }, [state.dirty, state.failed, state.saving])
   if (!state.available) return null
   const disabled = !state.writable
+  const title = t('title')
   return (
-    <div className="vlgt-card">
-      <div className="vlgt-head">
-        <h3 className="vlgt-title">{t('title')}</h3>
-        <p className="vlgt-description">{t('description')}</p>
-      </div>
+    <li className={`vlgt-card${open ? ' vlgt-card-open' : ''}`}>
+      <button
+        type="button"
+        className="vlgt-head"
+        aria-expanded={open}
+        aria-label={`${t(open ? 'collapse' : 'expand')}: ${title}`}
+        onClick={() => { setOpen(!open) }}
+      >
+        <span className="vlgt-head-text">
+          <span className="vlgt-title">{title}</span>
+          <span className="vlgt-description">{t('description')}</span>
+        </span>
+        {state.dirty && <span className="vlgt-unsaved">{t('unsaved')}</span>}
+        <span className={`vlgt-chevron${open ? ' vlgt-chevron-open' : ''}`} aria-hidden="true">⌄</span>
+      </button>
+
+      {open && <div className="vlgt-body">
+      {!state.writable && <p className="vlgt-readonly" role="status">{t('readOnly')}</p>}
 
       <Field
         id="vlgt-mode"
@@ -288,6 +314,7 @@ export function VlGatewayCard(props: VlGatewayCardProps) {
           {t('discard')}
         </button>
       </div>
-    </div>
+      </div>}
+    </li>
   )
 }

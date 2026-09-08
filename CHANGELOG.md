@@ -24,6 +24,9 @@ so releases keep installing on newer (or older) official dsh.
   and removed raw upstream failure messages from model-visible placeholders.
 - Added regression coverage for all three modes, generation isolation, cancellation,
   request bounds, projected media type, and refused Host settings mutations.
+- Matched native DSH plugin-card disclosure behavior: collapsed by default, drafts
+  survive a manual collapse, successful saves collapse automatically, and refused
+  saves remain open with accessible status.
 
 ## 0.1.6
 

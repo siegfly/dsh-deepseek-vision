@@ -7,7 +7,7 @@
  */
 export declare const NS = "vl-gateway";
 /** Locale keys this card renders. */
-export type VlGatewayLocaleKey = 'title' | 'description' | 'mode' | 'modeHint' | 'apiKey' | 'apiKeyHint' | 'apiKeySet' | 'apiKeyUnset' | 'apiKeyEnv' | 'apiKeyEnvHint' | 'baseURL' | 'baseURLHint' | 'model' | 'modelHint' | 'describePrompt' | 'describePromptHint' | 'timeoutMs' | 'timeoutMsHint' | 'maxTokens' | 'maxTokensHint' | 'maxPixels' | 'maxPixelsHint' | 'maxBytes' | 'maxBytesHint' | 'maxCacheEntries' | 'maxCacheEntriesHint' | 'onFailure' | 'onFailureHint' | 'overridden' | 'reset' | 'invalidNumber' | 'invalidChoice' | 'save' | 'discard' | 'saving' | 'saveFailed';
+export type VlGatewayLocaleKey = 'title' | 'description' | 'expand' | 'collapse' | 'unsaved' | 'readOnly' | 'mode' | 'modeHint' | 'apiKey' | 'apiKeyHint' | 'apiKeySet' | 'apiKeyUnset' | 'apiKeyEnv' | 'apiKeyEnvHint' | 'baseURL' | 'baseURLHint' | 'model' | 'modelHint' | 'describePrompt' | 'describePromptHint' | 'timeoutMs' | 'timeoutMsHint' | 'maxTokens' | 'maxTokensHint' | 'maxPixels' | 'maxPixelsHint' | 'maxBytes' | 'maxBytesHint' | 'maxCacheEntries' | 'maxCacheEntriesHint' | 'onFailure' | 'onFailureHint' | 'overridden' | 'reset' | 'invalidNumber' | 'invalidChoice' | 'save' | 'discard' | 'saving' | 'saveFailed';
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
         'vl-gateway': VlGatewayLocaleKey;

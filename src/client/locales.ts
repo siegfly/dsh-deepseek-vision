@@ -14,6 +14,10 @@ export const NS = 'vl-gateway'
 export type VlGatewayLocaleKey =
   | 'title'
   | 'description'
+  | 'expand'
+  | 'collapse'
+  | 'unsaved'
+  | 'readOnly'
   | 'mode'
   | 'modeHint'
   | 'apiKey'
@@ -58,6 +62,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const zh: Record<VlGatewayLocaleKey, string> = {
   title: 'DeepSeek + Vision（视觉语言桥接）',
   description: '贴图后由这里的 VL 模型转成文字再发给 DeepSeek。留空即继承默认值。',
+  expand: '展开',
+  collapse: '收起',
+  unsaved: '未保存',
+  readOnly: '当前设置为只读。',
   mode: '视觉回退模式',
   modeHint: 'native-first=原生视觉直通；always-describe=始终转文字；disabled=仅使用 DSH 原生能力。',
   apiKey: 'VL 模型密钥',
@@ -97,6 +105,10 @@ export const zh: Record<VlGatewayLocaleKey, string> = {
 export const en: Record<VlGatewayLocaleKey, string> = {
   title: 'DeepSeek + Vision (vision-language bridge)',
   description: 'Pasted images are described by this VL model before DeepSeek sees the text. Empty fields inherit the defaults.',
+  expand: 'Expand',
+  collapse: 'Collapse',
+  unsaved: 'Unsaved',
+  readOnly: 'These settings are read-only.',
   mode: 'Vision fallback mode',
   modeHint: 'native-first passes native vision through; always-describe converts every image; disabled uses only native DSH support.',
   apiKey: 'VL model API key',

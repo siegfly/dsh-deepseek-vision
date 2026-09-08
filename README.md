@@ -185,6 +185,7 @@ retry policy 全部从父类继承。
 `llm-vl-gateway` 也是一个 settings namespace，三个编辑入口：**设置 → 插件 → 插件配置**
 的"DeepSeek + Vision（视觉语言桥接）"卡片（`vl.*` 全字段 + VL 密钥）、Web Models 页
 （`deepseek.*` 子段由可配置 provider 目录接管）、`settings.yaml`（两个子段都可写）。
+卡片与 DSH 原生插件一致默认收起；折叠不会丢失草稿，保存成功后自动收起。
 
 ![插件设置卡片](./docs/images/plugin-settings.png)
 
