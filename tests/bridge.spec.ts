@@ -42,19 +42,41 @@ function request(messages: Message[]): GenerateOptions {
 
 function makeBridge(
   describe: (r: ImageAttachmentRef, data: Uint8Array, signal?: AbortSignal) => Promise<string>,
-  overrides: Partial<ConstructorParameters<typeof ImageBridge>[0]> = {},
-): ImageBridge {
-  const attachments = {
-    readImage: async (r: ImageAttachmentRef) => ({ ref: r, data: new Uint8Array([9]) }),
+  overrides: {
+    attachments?: AttachmentStore
+    describeModel?: () => string
+    maxCacheEntries?: () => number
+    onFailure?: () => 'fail' | 'placeholder'
+  } = {},
+) {
+  const attachments = overrides.attachments ?? {
+    readImageRequest: async (r: ImageAttachmentRef) => ({
+      attachment: r,
+      variantId: `variant-${r.attachmentId}`,
+      data: new Uint8Array([9]),
+      mediaType: r.mediaType,
+      bytes: 1,
+      width: r.width,
+      height: r.height,
+      depth: 'uchar',
+      space: 'srgb',
+      hasAlpha: false,
+    }),
   } as unknown as AttachmentStore
-  return new ImageBridge({
-    attachments,
-    describe,
-    describeModel: () => 'qwen-vl-max',
-    maxCacheEntries: () => 4,
-    onFailure: () => 'fail',
-    ...overrides,
-  })
+  const bridge = new ImageBridge({ attachments })
+  return {
+    rewrite: (options: GenerateOptions) => {
+      const model = overrides.describeModel?.() ?? 'qwen-vl-max'
+      return bridge.rewrite(options, {
+        cacheIdentity: model,
+        model,
+        imagePolicy: { maxPixels: 4_194_304, maxBytes: 5_000_000 },
+        maxCacheEntries: overrides.maxCacheEntries?.() ?? 4,
+        onFailure: overrides.onFailure?.() ?? 'fail',
+        describe: async (r, image, signal) => describe(r, image.data, signal),
+      })
+    },
+  }
 }
 
 describe('ImageBridge.rewrite', () => {
@@ -123,6 +145,29 @@ describe('ImageBridge.rewrite', () => {
     expect(calls).toBe(1)
   })
 
+  it('keeps a shared description alive when only one concurrent waiter aborts', async () => {
+    let release!: () => void
+    let providerSignal: AbortSignal | undefined
+    const bridge = makeBridge(async (_ref, _data, signal) => {
+      providerSignal = signal
+      await new Promise<void>(resolve => { release = resolve })
+      return 'shared result'
+    })
+    const cancelled = new AbortController()
+    const first = bridge.rewrite({
+      ...request([user([image(IMAGE_A)])]),
+      signal: cancelled.signal,
+    })
+    const second = bridge.rewrite(request([user([image(IMAGE_A)])]))
+    cancelled.abort(new Error('caller stopped'))
+    await expect(first).rejects.toThrow('caller stopped')
+    expect(providerSignal?.aborted).toBe(false)
+    release()
+    await expect(second).resolves.toMatchObject({
+      messages: [{ content: [{ text: expect.stringContaining('shared result') }] }],
+    })
+  })
+
   it('evicts failed descriptions so the next rewrite retries', async () => {
     let attempt = 0
     const describe = vi.fn(async () => {
@@ -144,7 +189,7 @@ describe('ImageBridge.rewrite', () => {
     const rewritten = await bridge.rewrite(request([user([image(IMAGE_A)])]))
     expect(rewritten.messages[0]!.content[0]).toMatchObject({
       type: 'text',
-      text: expect.stringContaining('description unavailable: vl down'),
+      text: expect.stringContaining('description unavailable (TRANSPORT)'),
     })
   })
 
@@ -159,22 +204,22 @@ describe('ImageBridge.rewrite', () => {
     const rewritten = await bridge.rewrite(request([user([image(IMAGE_A)])]))
     expect(rewritten.messages[0]!.content[0]).toMatchObject({
       type: 'text',
-      text: expect.stringContaining('description unavailable: boom'),
+      text: expect.stringContaining('description unavailable (AUTH)'),
     })
   })
 
-  it('stamps cached descriptions with the model that produced them, even after the model setting changes', async () => {
+  it('invalidates cached descriptions when the prepared VL identity changes', async () => {
     let model = 'qwen-vl-max'
-    const bridge = makeBridge(async () => 'screenshot content', { describeModel: () => model })
+    const describe = vi.fn(async () => 'screenshot content')
+    const bridge = makeBridge(describe, { describeModel: () => model })
     await bridge.rewrite(request([user([image(IMAGE_A)])]))
     model = 'qwen-vl-plus'
     const rewritten = await bridge.rewrite(request([user([image(IMAGE_A)])]))
-    // The cached text keeps the producing model's stamp: the setting changed,
-    // the provenance does not lie.
     expect(rewritten.messages[0]!.content[0]).toMatchObject({
       type: 'text',
-      text: expect.stringContaining('described by qwen-vl-max'),
+      text: expect.stringContaining('described by qwen-vl-plus'),
     })
+    expect(describe).toHaveBeenCalledTimes(2)
     expect(rewritten.messages[0]!.content[0]).toMatchObject({
       type: 'text',
       text: expect.stringContaining('screenshot content'),
@@ -257,7 +302,18 @@ describe('ImageBridge.rewrite', () => {
     const describe = vi.fn(async () => 'within')
     const bridge = makeBridge(describe, {
       attachments: {
-        readImage: async (r: ImageAttachmentRef) => ({ ref: r, data: new Uint8Array([9]) }),
+        readImageRequest: async (r: ImageAttachmentRef) => ({
+          attachment: r,
+          variantId: `variant-${r.attachmentId}`,
+          data: new Uint8Array([9]),
+          mediaType: r.mediaType,
+          bytes: 1,
+          width: r.width,
+          height: r.height,
+          depth: 'uchar',
+          space: 'srgb',
+          hasAlpha: false,
+        }),
         imageLimits: {
           maxImageBytes: 100_000,
           maxImagesPerMessage: 1,
@@ -296,7 +352,7 @@ describe('ImageBridge.rewrite', () => {
     const rewritten = await bridge.rewrite(request([user([image(oversized)])]))
     expect(rewritten.messages[0]!.content[0]).toMatchObject({
       type: 'text',
-      text: expect.stringContaining('description unavailable: image big exceeds the deployment image limits'),
+      text: expect.stringContaining('description unavailable (IMAGE_TOO_LARGE)'),
     })
   })
 

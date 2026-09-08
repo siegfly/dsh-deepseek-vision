@@ -41,6 +41,7 @@ function Field(props: {
   onEdit: (text: string) => void
   onReset: () => void
 }): import('react').ReactElement {
+  const hintId = `${props.id}-hint`
   return (
     <div className="vlgt-field">
       <div className="vlgt-field-head">
@@ -64,6 +65,8 @@ function Field(props: {
             className="vlgt-input"
             disabled={props.disabled}
             value={props.text}
+            aria-invalid={props.invalid}
+            aria-describedby={hintId}
             onChange={event => { props.onEdit(event.target.value) }}
           >
             <option value=""></option>
@@ -77,10 +80,12 @@ function Field(props: {
             type={props.type ?? 'text'}
             disabled={props.disabled}
             value={props.text}
+            aria-invalid={props.invalid}
+            aria-describedby={hintId}
             onChange={event => { props.onEdit(event.target.value) }}
           />
         )}
-      <div className="vlgt-hint">{props.invalid ? props.invalidLabel : props.hint}</div>
+      <div id={hintId} className="vlgt-hint">{props.invalid ? props.invalidLabel : props.hint}</div>
     </div>
   )
 }
@@ -101,6 +106,21 @@ export function VlGatewayCard(props: VlGatewayCardProps) {
         <h3 className="vlgt-title">{t('title')}</h3>
         <p className="vlgt-description">{t('description')}</p>
       </div>
+
+      <Field
+        id="vlgt-mode"
+        label={t('mode')}
+        hint={t('modeHint')}
+        overriddenLabel={t('overridden')}
+        resetLabel={t('reset')}
+        invalidLabel={t('invalidChoice')}
+        type="select"
+        choices={['native-first', 'always-describe', 'disabled']}
+        disabled={disabled}
+        {...state.mode}
+        onEdit={text => { props.edit('mode', text) }}
+        onReset={() => { props.resetField('mode') }}
+      />
 
       <Field
         id="vlgt-apiKey"
@@ -195,6 +215,45 @@ export function VlGatewayCard(props: VlGatewayCardProps) {
         onReset={() => { props.resetField('maxCacheEntries') }}
       />
       <Field
+        id="vlgt-maxTokens"
+        label={t('maxTokens')}
+        hint={t('maxTokensHint')}
+        overriddenLabel={t('overridden')}
+        resetLabel={t('reset')}
+        invalidLabel={t('invalidNumber')}
+        type="number"
+        disabled={disabled}
+        {...state.maxTokens}
+        onEdit={text => { props.edit('maxTokens', text) }}
+        onReset={() => { props.resetField('maxTokens') }}
+      />
+      <Field
+        id="vlgt-maxPixels"
+        label={t('maxPixels')}
+        hint={t('maxPixelsHint')}
+        overriddenLabel={t('overridden')}
+        resetLabel={t('reset')}
+        invalidLabel={t('invalidNumber')}
+        type="number"
+        disabled={disabled}
+        {...state.maxPixels}
+        onEdit={text => { props.edit('maxPixels', text) }}
+        onReset={() => { props.resetField('maxPixels') }}
+      />
+      <Field
+        id="vlgt-maxBytes"
+        label={t('maxBytes')}
+        hint={t('maxBytesHint')}
+        overriddenLabel={t('overridden')}
+        resetLabel={t('reset')}
+        invalidLabel={t('invalidNumber')}
+        type="number"
+        disabled={disabled}
+        {...state.maxBytes}
+        onEdit={text => { props.edit('maxBytes', text) }}
+        onReset={() => { props.resetField('maxBytes') }}
+      />
+      <Field
         id="vlgt-onFailure"
         label={t('onFailure')}
         hint={t('onFailureHint')}
@@ -210,8 +269,8 @@ export function VlGatewayCard(props: VlGatewayCardProps) {
       />
 
       <div className="vlgt-actions">
-        {state.failed && <span className="vlgt-failed">{t('saveFailed')}</span>}
-        {state.saving && <span className="vlgt-hint">{t('saving')}</span>}
+        {state.failed && <span className="vlgt-failed" role="status">{t('saveFailed')}</span>}
+        {state.saving && <span className="vlgt-hint" role="status">{t('saving')}</span>}
         <button
           type="button"
           className="vlgt-button vlgt-button-primary"

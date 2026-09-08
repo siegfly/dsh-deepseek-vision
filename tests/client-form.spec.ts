@@ -17,12 +17,16 @@ interface SectionUser {
 }
 
 interface Section {
+  mode?: string
   vl?: {
     apiKeyEnv?: string
     baseURL?: string
     model?: string
     describePrompt?: string
     timeoutMs?: number
+    maxTokens?: number
+    maxPixels?: number
+    maxBytes?: number
     maxCacheEntries?: number
     onFailure?: string
   }
@@ -74,15 +78,21 @@ function makeApi(): {
   ctx: Context
   credentialsDescribe: ReturnType<typeof vi.fn>
   credentialsSet: ReturnType<typeof vi.fn>
+  settingsMutate: ReturnType<typeof vi.fn>
 } {
   const credentialsDescribe = vi.fn(async () => ({ ok: true, value: {} }))
   const credentialsSet = vi.fn(async () => ({ ok: true }))
+  const settingsMutate = vi.fn(async () => ({ ok: true, value: {} }))
   return {
     ctx: {
-      remote: { credentials: { describe: credentialsDescribe, set: credentialsSet } },
+      remote: {
+        credentials: { describe: credentialsDescribe, set: credentialsSet },
+        settings: { mutate: settingsMutate },
+      },
     } as unknown as Context,
     credentialsDescribe,
     credentialsSet,
+    settingsMutate,
   }
 }
 
@@ -92,6 +102,10 @@ function makeForm(overrides: {
   const { scope, publish, mutate } = makeScope({})
   const form = new CardForm<Section>(
     overrides.scope ?? scope,
+    async (ops) => {
+      await mutate(ops)
+      return true
+    },
     [
       textField('baseURL', ['vl', 'baseURL']),
       textField('model', ['vl', 'model']),
@@ -176,10 +190,9 @@ describe.skipIf(!nodeClientRuntimeAvailable())('CardForm', () => {
   it('reports a refused write as failed and keeps the draft', async () => {
     const { form, scope, publish } = makeForm()
     publish({ value: {}, user: {} })
-    const mutate = vi.fn(async () => { throw new Error('refused') })
-    const failingScope = { ...scope, mutate } as SettingsScope<Section>
     const failing = new CardForm<Section>(
-      failingScope,
+      scope,
+      async () => false,
       [textField('baseURL', ['vl', 'baseURL'])],
     )
     failing.actions().edit('baseURL', 'https://x')
@@ -217,6 +230,29 @@ describe.skipIf(!nodeClientRuntimeAvailable())('VlGatewayCardController', () => 
     await vi.waitFor(() => {
       expect(credentialsDescribe).toHaveBeenCalledWith([DEFAULT_VL_API_KEY_REF])
     })
+  })
+
+  it('keeps a settings draft and reports failure when the Host refuses the mutation', async () => {
+    const { scope, publish } = makeScope({})
+    const { ctx, settingsMutate } = makeApi()
+    settingsMutate.mockResolvedValue({ ok: false, error: { code: 'CONFLICT' } })
+    const controller = new VlGatewayCardController(scope, ctx)
+    publish({ value: {}, user: {} })
+    const face = controller.inject()
+    face.edit('mode', 'always-describe')
+    face.save()
+    await vi.waitFor(() => {
+      expect(face.hooks.vlGatewayCard.getSnapshot()).toMatchObject({
+        failed: true,
+        dirty: true,
+        mode: { text: 'always-describe' },
+      })
+    })
+    expect(settingsMutate).toHaveBeenCalledWith(
+      'llm-vl-gateway',
+      [{ op: 'set', path: ['mode'], value: 'always-describe' }],
+      1,
+    )
   })
 
   it('writes the staged key to the credentials domain and reflects the read-back', async () => {

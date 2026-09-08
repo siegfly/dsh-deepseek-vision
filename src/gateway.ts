@@ -28,27 +28,39 @@ import type {
   StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { ImageBridge } from './bridge.js'
+import type { ImageBridgeGeneration } from './bridge.js'
 
 /** The gateway genuinely consumes images (via the VL leg), so the claim is real. */
 export const GATEWAY_INPUT_MODALITIES = ['text', 'image'] as const
+
+/** How this route treats image input. */
+export type VisionFallbackMode = 'native-first' | 'always-describe' | 'disabled'
 
 /**
  * One gateway route: models the DeepSeek catalog declares image-capable stream
  * natively, while text-only models get every image described before dispatch.
  */
 export class VisionGatewayAdapter extends DeepSeekAdapter {
+  private readonly bridge: ImageBridge
+  /** Live selector label captured again whenever the registration is replaced. */
+  private readonly displayName: () => string
+  /** Capture the complete vision leg for one prepared dispatch. */
+  private readonly prepareBridge: () => ImageBridgeGeneration
+  /** Live mode used by catalog queries and captured by prepared calls. */
+  private readonly mode: () => VisionFallbackMode
+
   constructor(
     config: DeepSeekAdapterOptions,
-    private readonly bridge: ImageBridge,
-    /**
-     * Live selector label. The registry captures `providerInfo` at
-     * registration, so a rename reaches `listProviders()` only through
-     * `registration.replace()`; this thunk makes that re-capture read the
-     * name in force, not the one from construction.
-     */
-    private readonly displayName: () => string,
+    bridge: ImageBridge,
+    displayName: () => string,
+    prepareBridge: () => ImageBridgeGeneration,
+    mode: () => VisionFallbackMode = () => 'native-first',
   ) {
     super(config)
+    this.bridge = bridge
+    this.displayName = displayName
+    this.prepareBridge = prepareBridge
+    this.mode = mode
   }
 
   override providerInfo(provider: string): LlmProviderInfo {
@@ -57,6 +69,7 @@ export class VisionGatewayAdapter extends DeepSeekAdapter {
 
   override async listModels(provider: string): Promise<readonly LlmModelInfo[]> {
     const models = await super.listModels(provider)
+    if (this.mode() === 'disabled') return models
     return models.map(model => ({ ...model, inputModalities: GATEWAY_INPUT_MODALITIES }))
   }
 
@@ -66,7 +79,9 @@ export class VisionGatewayAdapter extends DeepSeekAdapter {
     signal?: AbortSignal,
   ): Promise<LlmResolvedModelInfo> {
     const info = await super.resolveModel(provider, model, signal)
-    return { ...info, inputModalities: GATEWAY_INPUT_MODALITIES }
+    return this.mode() === 'disabled'
+      ? info
+      : { ...info, inputModalities: GATEWAY_INPUT_MODALITIES }
   }
 
   /**
@@ -82,11 +97,17 @@ export class VisionGatewayAdapter extends DeepSeekAdapter {
   ): Promise<PreparedAdapterCall> {
     const prepared = await super.prepareCall(provider, model, signal)
     const acceptsImages = prepared.model.inputModalities?.includes('image') === true
+    const mode = this.mode()
+    const bridge = this.prepareBridge()
+    const describesImages = mode === 'always-describe'
+      || (mode === 'native-first' && !acceptsImages)
     return {
-      model: { ...prepared.model, inputModalities: GATEWAY_INPUT_MODALITIES },
-      stream: (options) => acceptsImages
-        ? prepared.stream(options)
-        : this.streamRewritten(prepared, options),
+      model: mode === 'disabled'
+        ? prepared.model
+        : { ...prepared.model, inputModalities: GATEWAY_INPUT_MODALITIES },
+      stream: (options) => describesImages
+        ? this.streamRewritten(prepared, options, bridge)
+        : prepared.stream(options),
     }
   }
 
@@ -94,8 +115,9 @@ export class VisionGatewayAdapter extends DeepSeekAdapter {
   private async *streamRewritten(
     prepared: PreparedAdapterCall,
     options: GenerateOptions,
+    bridge: ImageBridgeGeneration,
   ): AsyncIterable<StreamChunk> {
-    yield* prepared.stream(await this.bridge.rewrite(options))
+    yield* prepared.stream(await this.bridge.rewrite(options, bridge))
   }
 
   /**
@@ -110,9 +132,13 @@ export class VisionGatewayAdapter extends DeepSeekAdapter {
   }
 
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    const rewritten = await this.acceptsImagesNatively(options.provider, options.model)
-      ? options
-      : await this.bridge.rewrite(options)
+    const mode = this.mode()
+    const acceptsImages = await this.acceptsImagesNatively(options.provider, options.model)
+    const describesImages = mode === 'always-describe'
+      || (mode === 'native-first' && !acceptsImages)
+    const rewritten = describesImages
+      ? await this.bridge.rewrite(options, this.prepareBridge())
+      : options
     yield* super.stream(rewritten)
   }
 }

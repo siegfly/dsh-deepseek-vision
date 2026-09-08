@@ -9,6 +9,22 @@ records the dsh version the committed `lib/` was built against — provenance, n
 install gate: every install rebuilds the plugin against the target machine's own dsh,
 so releases keep installing on newer (or older) official dsh.
 
+## Unreleased
+
+- Repositioned the route as an optional text-model vision fallback for dsh
+  `0.1.3-alpha.2`: `native-first` (default), `always-describe`, and `disabled`
+  modes make the boundary explicit while retaining native image passthrough.
+- Bound the complete VL configuration to each prepared call and keyed successful
+  cache entries by that configuration generation plus attachment id. Concurrent
+  callers now cancel independently instead of aborting shared work.
+- Projected images through dsh's public `readImageRequest` seam with configurable
+  pixel/byte limits, capped description output tokens, and preserved the projected
+  media type on the VL wire.
+- Made settings writes Host-authoritative, restored native image-access resolution,
+  and removed raw upstream failure messages from model-visible placeholders.
+- Added regression coverage for all three modes, generation isolation, cancellation,
+  request bounds, projected media type, and refused Host settings mutations.
+
 ## 0.1.6
 
 - dsh 0.1.1-rc.1 anchor: the forwarded credential event was renamed upstream

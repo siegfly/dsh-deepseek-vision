@@ -2,7 +2,7 @@
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 [![](https://img.shields.io/badge/release-v0.1.7-5B4CF0?style=flat-square)](./CHANGELOG.md)
-[![](https://img.shields.io/badge/verified-111%20tests-2EA44F?style=flat-square)](./tests)
+[![](https://img.shields.io/badge/verified-121%20tests-2EA44F?style=flat-square)](./tests)
 [![](https://img.shields.io/badge/coverage-97%25-brightgreen?style=flat-square)](./vitest.config.ts)
 [![](https://img.shields.io/badge/license-MIT-0B7285?style=flat-square)](./LICENSE)
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
@@ -11,8 +11,8 @@
 **安装：** `dsh plugin --profile web add dsh-deepseek-vision`
 
 **dsh-deepseek-vision 是给 DeepSeek Harness 的视觉语言网关插件。** 纯文本的 DeepSeek 编程模型
-通过一个"网关"provider 路由获得贴图能力：目录声明支持 image 的模型（官方
-`deepseek-v4-flash-vision-exp`）图片直通原生视觉端点；其余模型先由可配置的视觉模型
+通过一个"网关"provider 路由获得贴图能力：默认 `native-first`，目录声明支持 image 的模型
+图片直通原生视觉端点；其余模型先由可配置的视觉模型
 （默认 Qwen-VL）逐字描述成文字，再交给 DeepSeek 继续写代码。官方仓库零改动、跨机器
 安装不锁官方版本。同类方案里它是**最薄的桥**：不注入 agent 工具、不经过第三方中转、
 不依赖本地模型。
@@ -40,7 +40,7 @@
 - **贴图即用，不用换模型：** 注册独立路由 `deepseek-vision`（显示名 *DeepSeek + Vision*），
   真实声明 `inputModalities: ['text','image']`——聊天窗贴图、`tool-fs read_image`、浏览器
   截图、MCP 工具返回的图片、ACP 客户端内联图片全部放行。
-- **每张图只描述一次：** 按 `attachmentId` 进程内 LRU 缓存，重试、上下文压缩、后续轮次
+- **同代图片只描述一次：** 按“完整 VL 配置代际 + attachmentId”进程内 LRU 缓存，重试、上下文压缩、后续轮次
   复用同一份描述，不重复计费。
 - **会话不变量保持：** 原始图片仍持久化进 session log，历史 / 回放 / 重构不受影响。
 - **官方机制安装：** bundle 声明 + `dsh plugin add`，四种 spec（npm / git / 目录 / tarball）、
@@ -66,7 +66,7 @@ dsh 视觉插件生态在官方 harness 发布后的几十小时内密集涌现�
   只经过**你自己配置的 VL 端点**（你的 key、你的端点、你的数据）；
 - **不依赖本地模型**：无 Python / MLX / llama.cpp / Ollama 要求，装上即用；
 - **与官方插件同一发布质量**：官方 bundle 机制安装、装前兼容门禁、构建锚点章、
-  111 个测试 / 97% 覆盖率、双语文档。
+  121 个测试 / 97% 覆盖率、双语文档。
 
 | 维度 | 本插件 | 工具型（如 [dsh-vision-any](https://github.com/tianmingwan/dsh-vision-any)、[dsh-vision](https://github.com/linenxi-ctrl/dsh-vision)） | 路由型（如 [dsh-vision-router](https://github.com/ysr666/dsh-vision-router)） | 代理型（如 [dsh-vision-proxy](https://github.com/Flyvhidbwo/dsh-vision-proxy)） | 本地管线型（如 [DeepSeek-Harness-Vision-Tools](https://github.com/tonyd2wild/DeepSeek-Harness-Vision-Tools)） |
 | --- | --- | --- | --- | --- | --- |
@@ -168,6 +168,7 @@ retry policy 全部从父类继承。
 | --- | --- | --- |
 | `provider` | `deepseek-vision` | 注册的路由 id（避开 `deepseek-official`） |
 | `displayName` | `DeepSeek + Vision` | 模型选择器里的名字 |
+| `mode` | `native-first` | `native-first` = 原生视觉优先、文本模型回退；`always-describe` = 始终转描述；`disabled` = 完全退回官方 DSH 行为 |
 | `deepseek.*` | — | 与官方 `llm-deepseek` 段完全同构（apiKeyEnv / baseURL / thinking / reasoningEffort / maxTokens / models / retryPolicy…） |
 | `deepseek.apiKeyEnv` | `DEEPSEEK_API_KEY` | DeepSeek key |
 | `vl.apiKeyEnv` | `QWEN_VL_API_KEY` | VL 模型 key |
@@ -175,6 +176,9 @@ retry policy 全部从父类继承。
 | `vl.model` | `qwen3-vl-flash` | VL 模型 id（贴图 OCR 型描述性价比最高；复杂视觉推理可换 `qwen-vl-max`） |
 | `vl.describePrompt` | 详述 + 逐字提取的英文提示词 | 图片描述指令 |
 | `vl.timeoutMs` | `120000` | 单次描述请求硬超时 |
+| `vl.maxTokens` | `2048` | 单张图片描述的最大输出 token |
+| `vl.maxPixels` | `4194304` | DSH 在发送 VL 前进行确定性缩放的总像素上限 |
+| `vl.maxBytes` | `5000000` | DSH 在发送 VL 前进行确定性编码的目标字节数 |
 | `vl.maxCacheEntries` | `64` | 进程内描述缓存容量（LRU） |
 | `vl.onFailure` | `fail` | `fail` = 描述失败整个请求失败；`placeholder` = 降级为文字占位继续 |
 
@@ -196,6 +200,7 @@ patch 行内配置示例（全部可选）：
       config:
         deepseek:
           reasoningEffort: high
+        mode: native-first
         vl:
           apiKeyEnv: DASHSCOPE_API_KEY
           model: qwen3-vl-flash
@@ -308,12 +313,17 @@ pnpm build     # tsc（宿主面 + 客户端面）+ tsdown 浏览器 bundle
   按 `inputModalities` 准入拒绝，属预期行为，不是数据损坏）；新会话不受影响，重装即恢复。
 - **VL 失败语义**：默认 fail-closed——描述失败（如 key 失效）整个请求以稳定错误码
   （`AUTH` / `TIMEOUT` / `TRANSPORT`…）终止，不静默丢图；`onFailure: placeholder` 可降级。
-- **图片上限 fast-fail**：描述前按部署图片准入上限（`ctx.attachments.imageLimits`）预检，
-  超限图片在 base64 编码前就以 `IMAGE_TOO_LARGE` 失败（`placeholder` 策略下降级），不把
-  几 MB 的 data URL 送进 VL 端点再死。插件不做图片降采样（官方 seam 没有公开的降采样
-  能力）；部署上限内的图片仍可能超过 VL 供应商自己的大小上限，建议控制 `vl.timeoutMs`
-  并留意供应商文档。
+- **图片投影与上限**：先按部署准入上限 fast-fail，再通过新版 DSH 的
+  `readImageRequest` 公共 seam 按 `vl.maxPixels` / `vl.maxBytes` 确定性缩放和编码；描述输出另由
+  `vl.maxTokens` 限制。供应商仍可能有更低上限，请同时留意其文档。
+- **新版 DSH 下的定位**：插件不再是“所有图片能力”的必装件，而是文本模型的可选兼容层。
+  只使用原生视觉模型时可设 `mode: disabled` 或卸载；需要让 DeepSeek 文本/推理模型读取图片、
+  强制统一 OCR 描述，或使用独立 VL 供应商时，它仍提供官方原生路径没有替代的能力。
+- **缓存不是持久存储**：描述只保存在当前进程内；重启后可从持久化附件重新描述，但不会复用
+  上一进程的描述结果。
 - 描述文本会占用 DeepSeek 的 context（每图几百 token，仅首次计费）。
+- 新版 DSH 的 `imageRequestPricing` 是同步接口，首次描述生成前无法精确知道其文本 token；
+  当前上下文预检仍会低估这部分占用，实际输出由 `vl.maxTokens` 硬限制。
 
 ## FAQ
 

@@ -91,6 +91,18 @@ async function makeHarness(
   await ctx.plugin(LlmRuntime)
   const attachments = {
     readImage: async (r: ImageAttachmentRef) => ({ ref: r, data: new Uint8Array([1, 2, 3]) }),
+    readImageRequest: async (r: ImageAttachmentRef) => ({
+      attachment: r,
+      variantId: `variant-${r.attachmentId}`,
+      data: new Uint8Array([1, 2, 3]),
+      mediaType: r.mediaType,
+      bytes: 3,
+      width: r.width,
+      height: r.height,
+      depth: 'uchar',
+      space: 'srgb',
+      hasAlpha: false,
+    }),
   } as unknown as AttachmentStore
   ctx.provide('attachments', attachments)
   const fiber = await ctx.plugin(Object.assign(

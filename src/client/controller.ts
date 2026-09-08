@@ -37,12 +37,16 @@ export interface VlGatewayVlSection {
   model?: string
   describePrompt?: string
   timeoutMs?: number
+  maxTokens?: number
+  maxPixels?: number
+  maxBytes?: number
   maxCacheEntries?: number
   onFailure?: 'fail' | 'placeholder'
 }
 
 /** The namespace section view this card reads (only the `vl` member is used). */
 export interface VlGatewaySection {
+  mode?: 'native-first' | 'always-describe' | 'disabled'
   vl?: VlGatewayVlSection
 }
 
@@ -63,8 +67,12 @@ export interface VlGatewayCardState extends CardShell {
   model: CardFieldState
   describePrompt: CardFieldState
   timeoutMs: CardFieldState
+  maxTokens: CardFieldState
+  maxPixels: CardFieldState
+  maxBytes: CardFieldState
   maxCacheEntries: CardFieldState
   onFailure: CardFieldState
+  mode: CardFieldState
   /** The staged credential, which starts blank on every load. */
   apiKey: CardFieldState
   /** Whether the Host reports a credential configured for the referenced key. */
@@ -97,12 +105,24 @@ export class VlGatewayCardController {
   ) {
     this.form = new CardForm(
       scope,
+      async (ops, expectedRevision) => {
+        const response = await ctx.remote.settings.mutate(
+          GATEWAY_SETTINGS_NS,
+          [...ops],
+          expectedRevision,
+        )
+        return response.ok
+      },
       [
+        choiceField('mode', ['mode'], ['native-first', 'always-describe', 'disabled']),
         textField('apiKeyEnv', ['vl', 'apiKeyEnv']),
         textField('baseURL', ['vl', 'baseURL']),
         textField('model', ['vl', 'model']),
         textField('describePrompt', ['vl', 'describePrompt']),
         numberField('timeoutMs', ['vl', 'timeoutMs']),
+        numberField('maxTokens', ['vl', 'maxTokens']),
+        numberField('maxPixels', ['vl', 'maxPixels']),
+        numberField('maxBytes', ['vl', 'maxBytes']),
         numberField('maxCacheEntries', ['vl', 'maxCacheEntries']),
         choiceField('onFailure', ['vl', 'onFailure'], ['fail', 'placeholder']),
       ],
@@ -121,8 +141,12 @@ export class VlGatewayCardController {
       model: this.form.field('model'),
       describePrompt: this.form.field('describePrompt'),
       timeoutMs: this.form.field('timeoutMs'),
+      maxTokens: this.form.field('maxTokens'),
+      maxPixels: this.form.field('maxPixels'),
+      maxBytes: this.form.field('maxBytes'),
       maxCacheEntries: this.form.field('maxCacheEntries'),
       onFailure: this.form.field('onFailure'),
+      mode: this.form.field('mode'),
       apiKey: this.form.field(API_KEY_FIELD),
       apiKeyConfigured: this.credential.configured,
       apiKeyWritable: this.credential.writable,
@@ -171,9 +195,10 @@ export class VlGatewayCardController {
   /** Write the staged key, then re-read whether the Host now holds one. */
   private async writeKey(value: string): Promise<boolean> {
     try {
-      await this.ctx.remote.credentials.set(refOf(this.scope.getSnapshot()), value)
+      const response = await this.ctx.remote.credentials.set(refOf(this.scope.getSnapshot()), value)
+      if (!response.ok) return false
     } catch {
-      // Refusals surface through the re-read below.
+      return false
     }
     await this.readCredential()
     return this.credential.configured

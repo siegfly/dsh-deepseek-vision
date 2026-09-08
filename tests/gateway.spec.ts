@@ -22,6 +22,7 @@ import type {
 import type { CallId, GenerateOptions, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { ImageBridge } from '../src/bridge.js'
 import { GATEWAY_INPUT_MODALITIES, VisionGatewayAdapter } from '../src/gateway.js'
+import type { VisionFallbackMode } from '../src/gateway.js'
 
 const REF = {
   attachmentId: 'img-1',
@@ -124,6 +125,8 @@ function makeAdapter(
   port: number,
   describe: (r: ImageAttachmentRef, data: Uint8Array) => Promise<string>,
   displayName: () => string = () => 'DeepSeek + Vision',
+  mode: () => VisionFallbackMode = () => 'native-first',
+  bridgeModel: () => string = () => 'qwen-vl-max',
 ): VisionGatewayAdapter {
   const connection: ResolvedDeepSeekOptions = resolveAdapterOptions({
     baseURL: `http://127.0.0.1:${port}`,
@@ -147,12 +150,14 @@ function makeAdapter(
       hasAlpha: false,
     }),
   } as unknown as AttachmentStore
-  const bridge = new ImageBridge({
-    attachments,
-    describe,
-    describeModel: () => 'qwen-vl-max',
-    maxCacheEntries: () => 4,
-    onFailure: () => 'fail',
+  const bridge = new ImageBridge({ attachments })
+  const prepareBridge = () => ({
+    cacheIdentity: `test-generation:${bridgeModel()}`,
+    model: bridgeModel(),
+    imagePolicy: { maxPixels: 4_194_304, maxBytes: 5_000_000 },
+    maxCacheEntries: 4,
+    onFailure: 'fail' as const,
+    describe: async (r: ImageAttachmentRef, image: { data: Uint8Array }) => describe(r, image.data),
   })
   return new VisionGatewayAdapter(
     {
@@ -164,6 +169,8 @@ function makeAdapter(
     },
     bridge,
     displayName,
+    prepareBridge,
+    mode,
   )
 }
 
@@ -221,6 +228,14 @@ describe('VisionGatewayAdapter', () => {
     })
   })
 
+  it('disabled mode exposes the parent model contract and never claims fallback support', async () => {
+    await withDeepSeekServer(async (_captured, port) => {
+      const adapter = makeAdapter(port, async () => 'never called', undefined, () => 'disabled')
+      const info = await adapter.resolveModel('deepseek-vision', 'deepseek-v4-pro')
+      expect(info.inputModalities).not.toContain('image')
+    })
+  })
+
   it('rewrites images to text before the DeepSeek wire and surfaces the provider failure', async () => {
     await withDeepSeekServer(async (captured, port) => {
       const adapter = makeAdapter(port, async () => 'a wiring diagram')
@@ -263,6 +278,31 @@ describe('VisionGatewayAdapter', () => {
       expect(wire).toContain('image_url')
       expect(wire).toContain('data:image/png;base64')
       expect(wire).not.toContain('[Image:')
+    })
+  })
+
+  it('always-describe mode bridges even a catalog-declared native image model', async () => {
+    await withStreamingDeepSeekServer(async (captured, port) => {
+      const adapter = makeAdapter(port, async () => 'forced description', undefined, () => 'always-describe')
+      const request = imageRequest()
+      request.model = 'deepseek-v4-flash-vision-exp'
+      await drain(adapter.stream(request))
+      const wire = JSON.stringify(captured.body)
+      expect(wire).toContain('forced description')
+      expect(wire).not.toContain('image_url')
+    })
+  })
+
+  it('keeps the prepared VL generation stable across later configuration changes', async () => {
+    await withStreamingDeepSeekServer(async (captured, port) => {
+      let bridgeModel = 'vl-generation-a'
+      const adapter = makeAdapter(port, async () => 'stable description', undefined, undefined, () => bridgeModel)
+      const prepared = await adapter.prepareCall('deepseek-vision', 'deepseek-v4-flash')
+      bridgeModel = 'vl-generation-b'
+      await drain(prepared.stream(imageRequest()))
+      const wire = JSON.stringify(captured.body)
+      expect(wire).toContain('described by vl-generation-a')
+      expect(wire).not.toContain('vl-generation-b')
     })
   })
 

@@ -14,6 +14,8 @@ export const NS = 'vl-gateway'
 export type VlGatewayLocaleKey =
   | 'title'
   | 'description'
+  | 'mode'
+  | 'modeHint'
   | 'apiKey'
   | 'apiKeyHint'
   | 'apiKeySet'
@@ -28,6 +30,12 @@ export type VlGatewayLocaleKey =
   | 'describePromptHint'
   | 'timeoutMs'
   | 'timeoutMsHint'
+  | 'maxTokens'
+  | 'maxTokensHint'
+  | 'maxPixels'
+  | 'maxPixelsHint'
+  | 'maxBytes'
+  | 'maxBytesHint'
   | 'maxCacheEntries'
   | 'maxCacheEntriesHint'
   | 'onFailure'
@@ -50,6 +58,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const zh: Record<VlGatewayLocaleKey, string> = {
   title: 'DeepSeek + Vision（视觉语言桥接）',
   description: '贴图后由这里的 VL 模型转成文字再发给 DeepSeek。留空即继承默认值。',
+  mode: '视觉回退模式',
+  modeHint: 'native-first=原生视觉直通；always-describe=始终转文字；disabled=仅使用 DSH 原生能力。',
   apiKey: 'VL 模型密钥',
   apiKeyHint: '写入凭据存储，绝不出现在响应或设置里；留空不写。',
   apiKeySet: '已配置',
@@ -64,6 +74,12 @@ export const zh: Record<VlGatewayLocaleKey, string> = {
   describePromptHint: '发给 VL 模型的描述指令；逐字提取代码、报错、日志、UI 文案等。',
   timeoutMs: '超时（毫秒）',
   timeoutMsHint: '单次描述请求的硬超时，默认 120000。',
+  maxTokens: '描述最大 Token',
+  maxTokensHint: '单张图片描述的最大输出 Token，默认 2048。',
+  maxPixels: '请求图片最大像素',
+  maxPixelsHint: '发送给 VL 前由 DSH 等比缩放的总像素上限，默认 4194304。',
+  maxBytes: '请求图片目标字节数',
+  maxBytesHint: '发送给 VL 前的编码目标大小，默认 5000000。',
   maxCacheEntries: '缓存条数',
   maxCacheEntriesHint: '进程内按图片去重的描述缓存容量，默认 64。',
   onFailure: '失败策略',
@@ -81,6 +97,8 @@ export const zh: Record<VlGatewayLocaleKey, string> = {
 export const en: Record<VlGatewayLocaleKey, string> = {
   title: 'DeepSeek + Vision (vision-language bridge)',
   description: 'Pasted images are described by this VL model before DeepSeek sees the text. Empty fields inherit the defaults.',
+  mode: 'Vision fallback mode',
+  modeHint: 'native-first passes native vision through; always-describe converts every image; disabled uses only native DSH support.',
   apiKey: 'VL model API key',
   apiKeyHint: 'Written to the credential store; never appears in responses or settings. Leave blank to keep unchanged.',
   apiKeySet: 'configured',
@@ -95,6 +113,12 @@ export const en: Record<VlGatewayLocaleKey, string> = {
   describePromptHint: 'Instruction sent with each image; ask for verbatim extraction of code, errors, logs, and UI text.',
   timeoutMs: 'Timeout (ms)',
   timeoutMsHint: 'Hard cap on one description request; defaults to 120000.',
+  maxTokens: 'Description max tokens',
+  maxTokensHint: 'Maximum output tokens for one image description; defaults to 2048.',
+  maxPixels: 'Request image pixels',
+  maxPixelsHint: 'Total-pixel cap applied by DSH before VL upload; defaults to 4194304.',
+  maxBytes: 'Request image bytes',
+  maxBytesHint: 'Encoded-byte target applied before VL upload; defaults to 5000000.',
   maxCacheEntries: 'Cache entries',
   maxCacheEntriesHint: 'Per-image in-process description cache capacity; defaults to 64.',
   onFailure: 'Failure policy',

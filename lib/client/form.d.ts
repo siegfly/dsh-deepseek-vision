@@ -14,8 +14,11 @@
  */
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
+import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client';
 import type { CardActions, CardFieldState, CardSecretSpec, CardShell } from '@deepseek-ai/dsh-client-ui-settings-plugins/client';
 export type { CardActions, CardFieldState, CardSecretSpec, CardShell };
+/** Host-authoritative namespace mutation used by the form. */
+export type SettingsWriter = (ops: readonly SettingsPathOpView[], expectedRevision?: number) => Promise<boolean>;
 /** The write one field's staged text performs when the card is saved. */
 export type FieldWrite = {
     kind: 'set';
@@ -48,13 +51,14 @@ export declare function choiceField(field: string, path: readonly string[], choi
  */
 export declare class CardForm<T> {
     private readonly scope;
+    private readonly writeSettings;
     private readonly specs;
     private readonly secretSpecs;
     private readonly staged;
     private readonly listeners;
     private saving;
     private failed;
-    constructor(scope: SettingsScope<T>, specs: CardFieldSpec[], secrets?: CardSecretSpec[]);
+    constructor(scope: SettingsScope<T>, writeSettings: SettingsWriter, specs: CardFieldSpec[], secrets?: CardSecretSpec[]);
     /** Publish a projection of this form, rebuilt whenever the scope or a draft changes. */
     bind<S>(project: () => S): SnapshotStore<S>;
     /** Read the card-level state: what the Host serves, and what a save would do. */
@@ -75,7 +79,7 @@ export declare class CardForm<T> {
     private save;
     /** Every staged edit a save would write, in staging order. */
     private plan;
-    /** Path-addressed set through the bound settings scope. */
+    /** Path-addressed set with the revision observed when the user saved. */
     private write;
     /** Path-addressed clear, so the field re-inherits the composition layer. */
     private clear;

@@ -16,10 +16,11 @@
  * @module dsh-deepseek-vision
  */
 
+import { createHash } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
-import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
+import { assertUsableApiKey, LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import {
   resolveAdapterOptions,
   Config as DeepSeekSectionSchema,
@@ -38,13 +39,15 @@ import type { VlConnectionFacts } from './vl.js'
 import { ImageBridge } from './bridge.js'
 import type { VlFailurePolicy } from './bridge.js'
 import { VisionGatewayAdapter } from './gateway.js'
+import type { VisionFallbackMode } from './gateway.js'
 
 export const name = 'llm-vl-gateway'
 export const inject = ['llm', 'attachments']
 
 export { VisionGatewayAdapter, GATEWAY_INPUT_MODALITIES } from './gateway.js'
 export { ImageBridge } from './bridge.js'
-export type { VlFailurePolicy, ImageBridgeOptions } from './bridge.js'
+export type { VlFailurePolicy, ImageBridgeGeneration, ImageBridgeOptions } from './bridge.js'
+export type { VisionFallbackMode } from './gateway.js'
 export { describeImage } from './vl.js'
 export type { VlConnectionFacts, VlDescribeInput } from './vl.js'
 
@@ -65,6 +68,10 @@ export const DEFAULT_VL_MODEL = 'qwen3-vl-flash'
 export const DEFAULT_VL_TIMEOUT_MS = 120_000
 /** Bounded per-process description cache (one entry per unique attachment). */
 export const DEFAULT_VL_MAX_CACHE_ENTRIES = 64
+export const DEFAULT_VL_MAX_TOKENS = 2_048
+export const DEFAULT_VL_MAX_PIXELS = 4_194_304
+export const DEFAULT_VL_MAX_BYTES = 5_000_000
+export const DEFAULT_VISION_FALLBACK_MODE: VisionFallbackMode = 'native-first'
 
 /** Instruction sent beside each image; tune for your workload. */
 export const DEFAULT_VL_DESCRIBE_PROMPT = [
@@ -86,6 +93,12 @@ export interface VlSection {
   describePrompt?: string
   /** Hard cap on one description request, in milliseconds. */
   timeoutMs?: number
+  /** Maximum completion tokens returned for one description. */
+  maxTokens?: number
+  /** Total-pixel cap for the request image sent to the VL endpoint. */
+  maxPixels?: number
+  /** Encoded-byte target for the request image sent to the VL endpoint. */
+  maxBytes?: number
   /** Per-process description cache capacity. */
   maxCacheEntries?: number
   /** `fail` fails the whole request when a description cannot be produced; `placeholder` substitutes an error note. */
@@ -98,6 +111,8 @@ export interface Config {
   provider?: string
   /** Selector label; defaults to {@link DEFAULT_DISPLAY_NAME}. */
   displayName?: string
+  /** Native-first fallback, forced description, or native DSH behavior only. */
+  mode?: VisionFallbackMode
   /**
    * The DeepSeek leg — the full `llm-deepseek` section shape (key reference,
    * base URL, thinking mode, catalog, retry policy). The gateway route serves
@@ -114,6 +129,9 @@ const vlSectionSchema = z.object({
   model: z.string().default(DEFAULT_VL_MODEL),
   describePrompt: z.string().default(DEFAULT_VL_DESCRIBE_PROMPT),
   timeoutMs: z.number().min(1).max(MAX_TIMER_DELAY_MS).default(DEFAULT_VL_TIMEOUT_MS),
+  maxTokens: z.number().step(1).min(1).max(65_536).default(DEFAULT_VL_MAX_TOKENS),
+  maxPixels: z.number().step(1).min(1).max(100_000_000).default(DEFAULT_VL_MAX_PIXELS),
+  maxBytes: z.number().step(1).min(1).max(100_000_000).default(DEFAULT_VL_MAX_BYTES),
   maxCacheEntries: z.number().step(1).min(1).max(100_000).default(DEFAULT_VL_MAX_CACHE_ENTRIES),
   onFailure: z.union(['fail', 'placeholder']).default('fail' as const),
 })
@@ -125,6 +143,7 @@ export const Config: z<Config> = z.object({
   // does (see ensureRegistrationFacts below).
   provider: z.string().default(DEFAULT_PROVIDER),
   displayName: z.string().default(DEFAULT_DISPLAY_NAME),
+  mode: z.union(['native-first', 'always-describe', 'disabled']).default(DEFAULT_VISION_FALLBACK_MODE),
   deepseek: DeepSeekSectionSchema.default({}),
   vl: vlSectionSchema.default({
     apiKeyEnv: DEFAULT_VL_API_KEY_ENV,
@@ -132,6 +151,9 @@ export const Config: z<Config> = z.object({
     model: DEFAULT_VL_MODEL,
     describePrompt: DEFAULT_VL_DESCRIBE_PROMPT,
     timeoutMs: DEFAULT_VL_TIMEOUT_MS,
+    maxTokens: DEFAULT_VL_MAX_TOKENS,
+    maxPixels: DEFAULT_VL_MAX_PIXELS,
+    maxBytes: DEFAULT_VL_MAX_BYTES,
     maxCacheEntries: DEFAULT_VL_MAX_CACHE_ENTRIES,
     onFailure: 'fail',
   }),
@@ -144,6 +166,9 @@ interface ResolvedVlSection {
   model: string
   describePrompt: string
   timeoutMs: number
+  maxTokens: number
+  maxPixels: number
+  maxBytes: number
   maxCacheEntries: number
   onFailure: VlFailurePolicy
 }
@@ -158,6 +183,9 @@ function resolveVlSection(raw: Config): ResolvedVlSection {
     model: section.model ?? DEFAULT_VL_MODEL,
     describePrompt: section.describePrompt ?? DEFAULT_VL_DESCRIBE_PROMPT,
     timeoutMs: section.timeoutMs ?? DEFAULT_VL_TIMEOUT_MS,
+    maxTokens: section.maxTokens ?? DEFAULT_VL_MAX_TOKENS,
+    maxPixels: section.maxPixels ?? DEFAULT_VL_MAX_PIXELS,
+    maxBytes: section.maxBytes ?? DEFAULT_VL_MAX_BYTES,
     maxCacheEntries: section.maxCacheEntries ?? DEFAULT_VL_MAX_CACHE_ENTRIES,
     onFailure: section.onFailure ?? 'fail',
   }
@@ -227,27 +255,51 @@ export function apply(ctx: Context, config: Config): void {
   let userId: AnonymousUserId | undefined
   const resolveUserId = (): AnonymousUserId => userId ??= getOrCreateAnonymousUserId()
 
-  const vlFacts = async (): Promise<VlConnectionFacts> => {
-    const section = resolveVlSection(current())
+  const vlFacts = async (section: ResolvedVlSection): Promise<VlConnectionFacts> => {
     return {
       apiKey: await resolveVlApiKey(section.apiKeyEnv),
       baseURL: section.baseURL,
       model: section.model,
       describePrompt: section.describePrompt,
       timeoutMs: section.timeoutMs,
+      maxTokens: section.maxTokens,
     }
   }
 
   const bridge = new ImageBridge({
     attachments: ctx.attachments,
-    describe: async (ref, data, signal) => {
-      const facts = await vlFacts()
-      return describeImage({ ref, data, facts, signal })
-    },
-    describeModel: () => resolveVlSection(current()).model,
-    maxCacheEntries: () => resolveVlSection(current()).maxCacheEntries,
-    onFailure: () => resolveVlSection(current()).onFailure,
   })
+
+  const prepareBridge = () => {
+    const section = resolveVlSection(current())
+    const cacheIdentity = createHash('sha256').update(JSON.stringify({
+      protocol: 1,
+      baseURL: section.baseURL,
+      model: section.model,
+      describePrompt: section.describePrompt,
+      maxTokens: section.maxTokens,
+      maxPixels: section.maxPixels,
+      maxBytes: section.maxBytes,
+    })).digest('hex')
+    return {
+      cacheIdentity,
+      model: section.model,
+      imagePolicy: { maxPixels: section.maxPixels, maxBytes: section.maxBytes },
+      maxCacheEntries: section.maxCacheEntries,
+      onFailure: section.onFailure,
+      describe: async (
+        ref: Parameters<typeof describeImage>[0]['ref'],
+        image: { data: Uint8Array; mediaType: NonNullable<Parameters<typeof describeImage>[0]['mediaType']> },
+        signal?: AbortSignal,
+      ) => describeImage({
+        ref,
+        data: image.data,
+        mediaType: image.mediaType,
+        facts: await vlFacts(section),
+        signal,
+      }),
+    }
+  }
 
   // The route id and selector label read from the LIVE source: they are
   // captured by both registries, so a settings edit re-registers (below).
@@ -272,6 +324,11 @@ export function apply(ctx: Context, config: Config): void {
       // resolves images through it before serializing. The plugin injects
       // `attachments`, so the store is always present on this route.
       resolveAttachments: () => ctx.attachments,
+      resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(
+        attachments,
+        hostPath => ctx.get('fs')?.processPathFromHostPath(hostPath),
+        ref,
+      ),
       prepareExtensions: (request) => {
         const extensions = ctx.get('deepseekLlmApiExtensions')
         return extensions?.prepare(request)
@@ -280,6 +337,8 @@ export function apply(ctx: Context, config: Config): void {
     },
     bridge,
     currentDisplayName,
+    prepareBridge,
+    () => current().mode ?? DEFAULT_VISION_FALLBACK_MODE,
   )
 
   /** One configurable-provider directory entry, read from the live source. */

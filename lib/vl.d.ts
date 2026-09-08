@@ -9,7 +9,7 @@
  *
  * @module dsh-deepseek-vision/vl
  */
-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
+import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment';
 /** Per-call connection facts for the VL endpoint, resolved by the plugin. */
 export interface VlConnectionFacts {
     /** Bearer token resolved from the plugin's credential reference. */
@@ -22,11 +22,15 @@ export interface VlConnectionFacts {
     describePrompt: string;
     /** Hard cap on one description request, in milliseconds. */
     timeoutMs: number;
+    /** Maximum description completion tokens. */
+    maxTokens: number;
 }
 /** One description request: the durable image reference plus its resolved bytes. */
 export interface VlDescribeInput {
     ref: ImageAttachmentRef;
     data: Uint8Array;
+    /** Media type of the deterministic request projection (which may differ from the stored source). */
+    mediaType?: ImageMediaType;
     facts: VlConnectionFacts;
     /** Conversation cancellation; description failure follows it. */
     signal?: AbortSignal;

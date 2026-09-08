@@ -23,6 +23,7 @@ const FACTS: VlConnectionFacts = {
   model: 'qwen-vl-max',
   describePrompt: 'describe please',
   timeoutMs: 5_000,
+  maxTokens: 2_048,
 }
 
 interface Captured {
@@ -85,13 +86,33 @@ describe('describeImage', () => {
         const body = captured.body as {
           model: string
           stream: boolean
+          max_tokens: number
           messages: { role: string; content: { type: string; image_url?: { url: string }; text?: string }[] }[]
         }
         expect(body.model).toBe('qwen-vl-max')
         expect(body.stream).toBe(false)
+        expect(body.max_tokens).toBe(2_048)
         const parts = body.messages[0]!.content
         expect(parts[0]).toMatchObject({ type: 'image_url', image_url: { url: 'data:image/png;base64,AQID' } })
         expect(parts[1]).toEqual({ type: 'text', text: 'describe please' })
+      },
+    )
+  })
+
+  it('uses the projected request-image media type instead of stale source metadata', async () => {
+    await withServer(
+      (_captured, res) => {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ choices: [{ message: { content: 'projected' } }] }))
+      },
+      async (captured, port) => {
+        await describeImage({
+          ref: REF,
+          data: new Uint8Array([1, 2, 3]),
+          mediaType: 'image/jpeg',
+          facts: factsAt(port),
+        })
+        expect(JSON.stringify(captured.body)).toContain('data:image/jpeg;base64,AQID')
       },
     )
   })

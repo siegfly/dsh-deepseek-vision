@@ -2,7 +2,7 @@
 
 ## 接手目标
 
-当前分支完成了 API 兼容移植和 profile 启动验证，没有完成产品级架构与功能审计。接手 Agent 需要产出并实施：
+当前分支已完成 API 兼容移植、产品定位审计和核心实现收敛。插件定位为新版 DSH 上的可选“文本模型视觉回退层”，不是原生视觉的替代品：
 
 `旧版行为 → Next 架构/API → 差异 → 保留/删改/新增 → 验证用例`
 
@@ -26,7 +26,17 @@
 
 - `7a449fa fix: adapt vision gateway to dsh 0.1.3-alpha.2`
 
-它通过 `link:D:\Software\GIT-next\dsh-vl-gateway` 安装到 Next profile。已验证 alpha build、46 个 focused tests 和完整 profile 启动。构建 anchor 指向 DSH `0.1.3-alpha.2`；client-runtime 已替换为 Next Client store/settings/renderer API；Host settings 使用 Next registration；prepared call 保持准备时捕获的连接 generation。
+它通过 `link:D:\Software\GIT-next\dsh-vl-gateway` 安装到 Next profile。构建 anchor 指向 DSH `0.1.3-alpha.2`；client-runtime 已替换为 Next Client store/settings/renderer API；Host settings 使用 Next registration。
+
+本轮实现结论：
+
+- 新增 `native-first`（默认）、`always-describe`、`disabled` 三种模式；只用原生视觉时插件可关闭或卸载。
+- prepared call 同时捕获 DeepSeek 与完整 VL generation，设置变化只影响下一次 prepared call。
+- 缓存键升级为“完整 VL 投影 identity + attachmentId”；共享中的调用者可独立取消。
+- 使用公开 `readImageRequest` seam 做确定性缩放/编码，并新增 `maxPixels`、`maxBytes`、`maxTokens`。
+- Host settings mutation 的 `ok` 才代表保存成功；恢复原生 passthrough 的 image access；占位错误不再泄露第三方原文。
+
+仍需明确保留的风险：描述缓存是进程内缓存，不跨重启持久化；DSH 当前没有让插件把“图片→描述”投影作为一等请求记录持久化的公共 seam，因此重放可重新描述，但无法保证跨进程零重复计费或字节级相同描述。`imageRequestPricing` 是同步接口，第一次 VL 描述尚不存在时无法精确预估它将产生的文本 token，当前仍继承父 adapter 的图片计价，文本模型的预检会低估描述占用；`vl.maxTokens` 只负责给实际调用设硬上限。Client bundle 仍复制官方 preset，需由兼容检查持续监控。真实 VL 调用需要用户凭据，本轮不写入或读取明文凭据。
 
 ## 审计重点
 

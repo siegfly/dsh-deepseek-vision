@@ -120,6 +120,7 @@ async function makeHarness(deepseekPort: number, vlPort: number, config: plugin.
     saveImage: async () => {
       throw new Error('not implemented')
     },
+    imageHostPath: () => undefined,
     // dsh 0.1.1-rc.2: the parent's native image serialization resolves the
     // request version through readImageRequest(ref, policy, signal).
     readImageRequest: async (r: ImageAttachmentRef) => ({
@@ -162,6 +163,12 @@ async function makeSettingsHarness(deepseekPort: number, vlPort: number): Promis
   await ctx.plugin(LlmRuntime)
   const attachments = {
     readImage: async (r: ImageAttachmentRef) => ({ ref: r, data: new Uint8Array([1]) }),
+    imageHostPath: () => undefined,
+    readImageRequest: async (r: ImageAttachmentRef) => ({
+      attachment: r, variantId: `variant-${r.attachmentId}`,
+      data: new Uint8Array([1]), mediaType: r.mediaType, bytes: 1,
+      width: r.width, height: r.height, depth: 'uchar', space: 'srgb', hasAlpha: false,
+    }),
   } as unknown as AttachmentStore
   ctx.provide('attachments', attachments)
   // Mounted like upstream (settings.spec.ts:53-57): the provider registers
@@ -401,6 +408,12 @@ describe('llm-vl-gateway plugin', () => {
         await ctx.plugin(LlmRuntime)
         const attachments = {
           readImage: async (r: ImageAttachmentRef) => ({ ref: r, data: new Uint8Array([1]) }),
+          imageHostPath: () => undefined,
+          readImageRequest: async (r: ImageAttachmentRef) => ({
+            attachment: r, variantId: `variant-${r.attachmentId}`,
+            data: new Uint8Array([1]), mediaType: r.mediaType, bytes: 1,
+            width: r.width, height: r.height, depth: 'uchar', space: 'srgb', hasAlpha: false,
+          }),
         } as unknown as AttachmentStore
         ctx.provide('attachments', attachments)
         ctx.provide('settings', settings)

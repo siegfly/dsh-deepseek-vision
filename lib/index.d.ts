@@ -19,11 +19,13 @@ import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import type { Config as DeepSeekSection } from '@deepseek-ai/dsh-llm-deepseek';
 import type { VlFailurePolicy } from './bridge.js';
+import type { VisionFallbackMode } from './gateway.js';
 export declare const name = "llm-vl-gateway";
 export declare const inject: string[];
 export { VisionGatewayAdapter, GATEWAY_INPUT_MODALITIES } from './gateway.js';
 export { ImageBridge } from './bridge.js';
-export type { VlFailurePolicy, ImageBridgeOptions } from './bridge.js';
+export type { VlFailurePolicy, ImageBridgeGeneration, ImageBridgeOptions } from './bridge.js';
+export type { VisionFallbackMode } from './gateway.js';
 export { describeImage } from './vl.js';
 export type { VlConnectionFacts, VlDescribeInput } from './vl.js';
 /** The provider route this plugin owns (avoid `deepseek-official`, which llm-deepseek owns). */
@@ -40,6 +42,10 @@ export declare const DEFAULT_VL_MODEL = "qwen3-vl-flash";
 export declare const DEFAULT_VL_TIMEOUT_MS = 120000;
 /** Bounded per-process description cache (one entry per unique attachment). */
 export declare const DEFAULT_VL_MAX_CACHE_ENTRIES = 64;
+export declare const DEFAULT_VL_MAX_TOKENS = 2048;
+export declare const DEFAULT_VL_MAX_PIXELS = 4194304;
+export declare const DEFAULT_VL_MAX_BYTES = 5000000;
+export declare const DEFAULT_VISION_FALLBACK_MODE: VisionFallbackMode;
 /** Instruction sent beside each image; tune for your workload. */
 export declare const DEFAULT_VL_DESCRIBE_PROMPT: string;
 /** The vision-language leg of the plugin configuration. */
@@ -54,6 +60,12 @@ export interface VlSection {
     describePrompt?: string;
     /** Hard cap on one description request, in milliseconds. */
     timeoutMs?: number;
+    /** Maximum completion tokens returned for one description. */
+    maxTokens?: number;
+    /** Total-pixel cap for the request image sent to the VL endpoint. */
+    maxPixels?: number;
+    /** Encoded-byte target for the request image sent to the VL endpoint. */
+    maxBytes?: number;
     /** Per-process description cache capacity. */
     maxCacheEntries?: number;
     /** `fail` fails the whole request when a description cannot be produced; `placeholder` substitutes an error note. */
@@ -65,6 +77,8 @@ export interface Config {
     provider?: string;
     /** Selector label; defaults to {@link DEFAULT_DISPLAY_NAME}. */
     displayName?: string;
+    /** Native-first fallback, forced description, or native DSH behavior only. */
+    mode?: VisionFallbackMode;
     /**
      * The DeepSeek leg — the full `llm-deepseek` section shape (key reference,
      * base URL, thinking mode, catalog, retry policy). The gateway route serves

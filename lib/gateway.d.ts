@@ -20,29 +20,24 @@ import { DeepSeekAdapter } from '@deepseek-ai/dsh-llm-deepseek';
 import type { DeepSeekAdapterOptions } from '@deepseek-ai/dsh-llm-deepseek';
 import type { GenerateOptions, LlmModelInfo, LlmProviderInfo, LlmResolvedModelInfo, PreparedAdapterCall, StreamChunk } from '@deepseek-ai/dsh-llm';
 import type { ImageBridge } from './bridge.js';
+import type { ImageBridgeGeneration } from './bridge.js';
 /** The gateway genuinely consumes images (via the VL leg), so the claim is real. */
 export declare const GATEWAY_INPUT_MODALITIES: readonly ["text", "image"];
+/** How this route treats image input. */
+export type VisionFallbackMode = 'native-first' | 'always-describe' | 'disabled';
 /**
  * One gateway route: models the DeepSeek catalog declares image-capable stream
  * natively, while text-only models get every image described before dispatch.
  */
 export declare class VisionGatewayAdapter extends DeepSeekAdapter {
     private readonly bridge;
-    /**
-     * Live selector label. The registry captures `providerInfo` at
-     * registration, so a rename reaches `listProviders()` only through
-     * `registration.replace()`; this thunk makes that re-capture read the
-     * name in force, not the one from construction.
-     */
+    /** Live selector label captured again whenever the registration is replaced. */
     private readonly displayName;
-    constructor(config: DeepSeekAdapterOptions, bridge: ImageBridge, 
-    /**
-     * Live selector label. The registry captures `providerInfo` at
-     * registration, so a rename reaches `listProviders()` only through
-     * `registration.replace()`; this thunk makes that re-capture read the
-     * name in force, not the one from construction.
-     */
-    displayName: () => string);
+    /** Capture the complete vision leg for one prepared dispatch. */
+    private readonly prepareBridge;
+    /** Live mode used by catalog queries and captured by prepared calls. */
+    private readonly mode;
+    constructor(config: DeepSeekAdapterOptions, bridge: ImageBridge, displayName: () => string, prepareBridge: () => ImageBridgeGeneration, mode?: () => VisionFallbackMode);
     providerInfo(provider: string): LlmProviderInfo;
     listModels(provider: string): Promise<readonly LlmModelInfo[]>;
     resolveModel(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;

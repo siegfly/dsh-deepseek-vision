@@ -26,11 +26,15 @@ export interface VlGatewayVlSection {
     model?: string;
     describePrompt?: string;
     timeoutMs?: number;
+    maxTokens?: number;
+    maxPixels?: number;
+    maxBytes?: number;
     maxCacheEntries?: number;
     onFailure?: 'fail' | 'placeholder';
 }
 /** The namespace section view this card reads (only the `vl` member is used). */
 export interface VlGatewaySection {
+    mode?: 'native-first' | 'always-describe' | 'disabled';
     vl?: VlGatewayVlSection;
 }
 /** What the VL gateway card renders. */
@@ -40,8 +44,12 @@ export interface VlGatewayCardState extends CardShell {
     model: CardFieldState;
     describePrompt: CardFieldState;
     timeoutMs: CardFieldState;
+    maxTokens: CardFieldState;
+    maxPixels: CardFieldState;
+    maxBytes: CardFieldState;
     maxCacheEntries: CardFieldState;
     onFailure: CardFieldState;
+    mode: CardFieldState;
     /** The staged credential, which starts blank on every load. */
     apiKey: CardFieldState;
     /** Whether the Host reports a credential configured for the referenced key. */

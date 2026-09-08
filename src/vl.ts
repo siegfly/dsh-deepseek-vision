@@ -16,7 +16,7 @@ import {
   isQuotaExceededError,
   LlmError,
 } from '@deepseek-ai/dsh-llm'
-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
 
 /** Per-call connection facts for the VL endpoint, resolved by the plugin. */
 export interface VlConnectionFacts {
@@ -30,12 +30,16 @@ export interface VlConnectionFacts {
   describePrompt: string
   /** Hard cap on one description request, in milliseconds. */
   timeoutMs: number
+  /** Maximum description completion tokens. */
+  maxTokens: number
 }
 
 /** One description request: the durable image reference plus its resolved bytes. */
 export interface VlDescribeInput {
   ref: ImageAttachmentRef
   data: Uint8Array
+  /** Media type of the deterministic request projection (which may differ from the stored source). */
+  mediaType?: ImageMediaType
   facts: VlConnectionFacts
   /** Conversation cancellation; description failure follows it. */
   signal?: AbortSignal
@@ -107,7 +111,7 @@ function extractText(content: unknown): string | undefined {
  */
 export async function describeImage(input: VlDescribeInput): Promise<string> {
   const { ref, data, facts, signal } = input
-  const dataUrl = `data:${ref.mediaType};base64,${Buffer.from(data).toString('base64')}`
+  const dataUrl = `data:${input.mediaType ?? ref.mediaType};base64,${Buffer.from(data).toString('base64')}`
   const timeout = AbortSignal.timeout(facts.timeoutMs)
   const upstream = signal === undefined ? timeout : AbortSignal.any([signal, timeout])
 
@@ -124,6 +128,7 @@ export async function describeImage(input: VlDescribeInput): Promise<string> {
       body: JSON.stringify({
         model: facts.model,
         stream: false,
+        max_tokens: facts.maxTokens,
         messages: [{
           role: 'user',
           content: [

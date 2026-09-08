@@ -2,7 +2,7 @@
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 [![](https://img.shields.io/badge/release-v0.1.7-5B4CF0?style=flat-square)](./CHANGELOG.md)
-[![](https://img.shields.io/badge/verified-111%20tests-2EA44F?style=flat-square)](./tests)
+[![](https://img.shields.io/badge/verified-121%20tests-2EA44F?style=flat-square)](./tests)
 [![](https://img.shields.io/badge/coverage-97%25-brightgreen?style=flat-square)](./vitest.config.ts)
 [![](https://img.shields.io/badge/license-MIT-0B7285?style=flat-square)](./LICENSE)
 [![](https://img.shields.io/badge/Node.js-%5E22.19%20%7C%20%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./package.json)
@@ -43,7 +43,8 @@ local model requirement.
   *DeepSeek + Vision*) with a real `inputModalities: ['text','image']` declaration — chat
   pastes, `tool-fs read_image`, browser screenshot tools, MCP tool-returned images, and
   ACP inline images all get through.
-- **Describe each image once:** per-`attachmentId` in-process LRU cache; retries,
+- **Describe once per configuration generation:** the in-process LRU key covers the full
+  VL configuration generation plus `attachmentId`; retries,
   compaction, and later turns reuse the same description — no double billing.
 - **Session invariants hold:** original images stay persisted in the session log; history /
   replay / reconstruction are unaffected.
@@ -78,7 +79,7 @@ thinnest bridge** — one provider route, and nothing else.
 - **No local model dependency:** no Python / MLX / llama.cpp / Ollama requirements;
   install and go.
 - **Official-grade release quality:** official bundle install mechanism, pre-install
-  compatibility gates, build-anchor stamp, 111 tests / 97% coverage, bilingual docs.
+  compatibility gates, build-anchor stamp, 121 tests / 97% coverage, bilingual docs.
 
 | Dimension | This plugin | Tool-style (e.g. [dsh-vision-any](https://github.com/tianmingwan/dsh-vision-any), [dsh-vision](https://github.com/linenxi-ctrl/dsh-vision)) | Router-style (e.g. [dsh-vision-router](https://github.com/ysr666/dsh-vision-router)) | Proxy-style (e.g. [dsh-vision-proxy](https://github.com/Flyvhidbwo/dsh-vision-proxy)) | Local-pipeline (e.g. [DeepSeek-Harness-Vision-Tools](https://github.com/tonyd2wild/DeepSeek-Harness-Vision-Tools)) |
 | --- | --- | --- | --- | --- | --- |
@@ -150,7 +151,7 @@ Select the **DeepSeek + Vision** provider in the chat:
   logs, UI text, plus layout);
 - the description replaces the image for DeepSeek → you keep coding with DeepSeek while
   gaining image understanding;
-- each image is described once and the result is reused across retries and turns;
+- each image/configuration generation is described once and reused across retries and turns;
 - the session log still persists the original images.
 
 ## How It Works
@@ -192,6 +193,7 @@ process always wins and cannot be changed in the GUI:
 | --- | --- | --- |
 | `provider` | `deepseek-vision` | registered route id (avoids `deepseek-official`) |
 | `displayName` | `DeepSeek + Vision` | name in the model picker |
+| `mode` | `native-first` | `native-first` prefers native vision and falls back for text models; `always-describe` forces projection; `disabled` restores stock DSH behavior |
 | `deepseek.*` | — | identical shape to the official `llm-deepseek` section (apiKeyEnv / baseURL / thinking / reasoningEffort / maxTokens / models / retryPolicy…) |
 | `deepseek.apiKeyEnv` | `DEEPSEEK_API_KEY` | DeepSeek key |
 | `vl.apiKeyEnv` | `QWEN_VL_API_KEY` | VL model key |
@@ -199,6 +201,9 @@ process always wins and cannot be changed in the GUI:
 | `vl.model` | `qwen3-vl-flash` | VL model id (best price for OCR-style descriptions; use `qwen-vl-max` for hard visual reasoning) |
 | `vl.describePrompt` | detailed English prompt with verbatim extraction | the description instruction |
 | `vl.timeoutMs` | `120000` | hard timeout per description request |
+| `vl.maxTokens` | `2048` | maximum description output tokens per image |
+| `vl.maxPixels` | `4194304` | deterministic DSH request-image pixel cap before VL upload |
+| `vl.maxBytes` | `5000000` | deterministic DSH request-image encoding target before VL upload |
 | `vl.maxCacheEntries` | `64` | in-process description cache capacity (LRU) |
 | `vl.onFailure` | `fail` | `fail` = failed description fails the request; `placeholder` = degrade to a text placeholder |
 
@@ -220,6 +225,7 @@ Inline patch config example (all optional):
       config:
         deepseek:
           reasoningEffort: high
+        mode: native-first
         vl:
           apiKeyEnv: DASHSCOPE_API_KEY
           model: qwen3-vl-flash
@@ -347,12 +353,19 @@ Details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Contributing:
 - **VL failure semantics**: fail-closed by default — a failed description (e.g. dead key)
   aborts the request with a stable code (`AUTH` / `TIMEOUT` / `TRANSPORT`…) instead of
   silently dropping the image; `onFailure: placeholder` degrades.
-- **image limit fast-fail**: oversized images (per deployment `ctx.attachments.imageLimits`)
-  fail with `IMAGE_TOO_LARGE` before base64 encoding, instead of shipping megabyte data
-  URLs to the VL endpoint. No downsampling (no public seam for it); images within the
-  deployment limit can still exceed the VL provider's own size cap — mind `vl.timeoutMs`
-  and the provider docs.
+- **request projection and limits**: deployment limits fail fast first; the new DSH
+  `readImageRequest` seam then deterministically scales and encodes to `vl.maxPixels` /
+  `vl.maxBytes`, while `vl.maxTokens` caps description output. Providers may impose lower limits.
+- **role on new DSH**: this is no longer required for all image support; it is an optional
+  compatibility layer for text models. Set `mode: disabled` or uninstall when native vision is
+  sufficient. It remains useful for DeepSeek text/reasoning models, forced uniform OCR, or a
+  separately controlled VL provider.
+- **the cache is not durable storage**: after restart, durable attachments can be described
+  again, but descriptions from the previous process are not reused.
 - Descriptions consume DeepSeek context (a few hundred tokens per image, billed once).
+- DSH's `imageRequestPricing` is synchronous, so it cannot know a first-time dynamic
+  description's exact token count; context preflight currently underestimates that portion,
+  while `vl.maxTokens` still hard-caps the actual description response.
 
 ## FAQ
 

@@ -16,6 +16,7 @@
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 // Type-only imports from the in-box card contract (erased before the client
 // purity gate runs): these four shapes are the drift-free official ones, so
@@ -29,6 +30,12 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 
 export type { CardActions, CardFieldState, CardSecretSpec, CardShell }
+
+/** Host-authoritative namespace mutation used by the form. */
+export type SettingsWriter = (
+  ops: readonly SettingsPathOpView[],
+  expectedRevision?: number,
+) => Promise<boolean>
 
 /** The write one field's staged text performs when the card is saved. */
 export type FieldWrite =
@@ -135,6 +142,7 @@ export class CardForm<T> {
 
   constructor(
     private readonly scope: SettingsScope<T>,
+    private readonly writeSettings: SettingsWriter,
     specs: CardFieldSpec[],
     secrets: CardSecretSpec[] = [],
   ) {
@@ -249,11 +257,13 @@ export class CardForm<T> {
     return plan
   }
 
-  /** Path-addressed set through the bound settings scope. */
+  /** Path-addressed set with the revision observed when the user saved. */
   private async write(spec: CardFieldSpec, value: unknown): Promise<boolean> {
     try {
-      await this.scope.mutate([{ op: 'set', path: [...spec.path], value: value as JsonValue }])
-      return true
+      return await this.writeSettings(
+        [{ op: 'set', path: [...spec.path], value: value as JsonValue }],
+        this.scope.getSnapshot().revision,
+      )
     } catch {
       return false
     }
@@ -262,8 +272,10 @@ export class CardForm<T> {
   /** Path-addressed clear, so the field re-inherits the composition layer. */
   private async clear(spec: CardFieldSpec): Promise<boolean> {
     try {
-      await this.scope.mutate([{ op: 'unset', path: [...spec.path] }])
-      return true
+      return await this.writeSettings(
+        [{ op: 'unset', path: [...spec.path] }],
+        this.scope.getSnapshot().revision,
+      )
     } catch {
       return false
     }

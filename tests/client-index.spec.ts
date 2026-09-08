@@ -51,8 +51,13 @@ function mountClient(): Promise<{ cards: RegisteredCard[]; face: () => unknown }
     describe: async () => ({ ok: true, value: {} }),
     set: async () => ({ ok: true }),
   }
-  ctx.provide('remote', { $on: () => () => {}, credentials })
+  ctx.provide('remote', {
+    $on: () => () => {},
+    credentials,
+    settings: { mutate: async () => ({ ok: true }) },
+  })
   ctx.provide('remote.credentials', credentials)
+  ctx.provide('remote.settings', { mutate: async () => ({ ok: true }) })
   ctx.provide('settingsScope', { bind: () => scope })
   return ctx.plugin(Object.assign(
     (inner: Context) => client.apply(inner as never),
@@ -95,6 +100,8 @@ describe.skipIf(!nodeClientRuntimeAvailable())('client plugin half', () => {
   })
 
   it('declares the client services the card needs', () => {
-    expect(client.inject).toEqual(['slots', 'locale', 'remote', 'remote.credentials', 'settingsScope'])
+    expect(client.inject).toEqual([
+      'slots', 'locale', 'remote', 'remote.credentials', 'remote.settings', 'settingsScope',
+    ])
   })
 })

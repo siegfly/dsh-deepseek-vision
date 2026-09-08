@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest'
 import {
   Config, DEFAULT_DISPLAY_NAME, DEFAULT_PROVIDER, DEFAULT_VL_API_KEY_ENV,
   DEFAULT_VL_BASE_URL, DEFAULT_VL_DESCRIBE_PROMPT, DEFAULT_VL_MAX_CACHE_ENTRIES,
-  DEFAULT_VL_MODEL, DEFAULT_VL_TIMEOUT_MS,
+  DEFAULT_VL_MAX_BYTES, DEFAULT_VL_MAX_PIXELS, DEFAULT_VL_MAX_TOKENS,
+  DEFAULT_VL_MODEL, DEFAULT_VL_TIMEOUT_MS, DEFAULT_VISION_FALLBACK_MODE,
 } from '../src/index.js'
 
 describe('Config schema', () => {
@@ -17,6 +18,7 @@ describe('Config schema', () => {
     const value = Config({})
     expect(value.provider).toBe(DEFAULT_PROVIDER)
     expect(value.displayName).toBe(DEFAULT_DISPLAY_NAME)
+    expect(value.mode).toBe(DEFAULT_VISION_FALLBACK_MODE)
     expect(value.deepseek).toBeTruthy()
     expect(value.vl).toEqual({
       apiKeyEnv: DEFAULT_VL_API_KEY_ENV,
@@ -25,6 +27,9 @@ describe('Config schema', () => {
       describePrompt: DEFAULT_VL_DESCRIBE_PROMPT,
       timeoutMs: DEFAULT_VL_TIMEOUT_MS,
       maxCacheEntries: DEFAULT_VL_MAX_CACHE_ENTRIES,
+      maxTokens: DEFAULT_VL_MAX_TOKENS,
+      maxPixels: DEFAULT_VL_MAX_PIXELS,
+      maxBytes: DEFAULT_VL_MAX_BYTES,
       onFailure: 'fail',
     })
   })
@@ -38,11 +43,19 @@ describe('Config schema', () => {
     expect(() => Config({ vl: { onFailure: 'bogus' as never } })).toThrow()
   })
 
+  it('rejects an unknown fallback mode', () => {
+    expect(() => Config({ mode: 'bogus' as never })).toThrow()
+  })
+
   it('rejects a non-positive VL timeout', () => {
     expect(() => Config({ vl: { timeoutMs: 0 } })).toThrow()
   })
 
   it('rejects a zero description-cache capacity', () => {
     expect(() => Config({ vl: { maxCacheEntries: 0 } })).toThrow()
+  })
+
+  it.each(['maxTokens', 'maxPixels', 'maxBytes'] as const)('rejects a non-positive %s', (field) => {
+    expect(() => Config({ vl: { [field]: 0 } })).toThrow()
   })
 })
